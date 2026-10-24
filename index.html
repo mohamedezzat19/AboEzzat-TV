@@ -4,38 +4,75 @@
   <meta charset="UTF-8">
   <meta http-equiv="X-UA-Compatible" content="IE=edge">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>AboEzzat TV</title>
+  <title>AboEzzat TV Luxury</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Cairo:wght@400;600;700;900&display=swap" rel="stylesheet">
   <link rel="stylesheet" href="style.css">
   <script src="hls.min.js"></script>
 </head>
 <body>
 
-  <!-- شاشة الترحيب والمعلومات -->
+  <!-- شاشة الترحيب الفاخرة ثلاثية الأبعاد -->
   <div id="welcome-screen">
+    <!-- كرات النيون المتحركة في الخلفية -->
+    <div class="ambient-glow glow-1"></div>
+    <div class="ambient-glow glow-2"></div>
+    <div class="ambient-glow glow-3"></div>
+
     <div class="welcome-box">
-      <h1 class="main-title">أهلاً بك يا أبو عزت</h1>
+      <!-- شعار متوهج ثلاثي الأبعاد -->
+      <div class="brand-badge">
+        <span class="badge-dot"></span>
+        <span class="badge-text">ABOEZZAT CINEMA ENGINE</span>
+      </div>
+
+      <h1 class="main-title">
+        أهلاً بك يا <span class="highlight-name">أبو عزت</span>
+      </h1>
       
       <div class="info-card">
-        <div class="info-row">
-          <span class="info-label">حالة الاتصال:</span>
-          <span id="conn-status" class="status-badge disconnected">غير متصل</span>
-        </div>
-        <div class="info-row">
-          <span class="info-label">عنوان الشاشة (IP):</span>
-          <span id="tv-ip" class="info-value">جاري القراءة...</span>
-        </div>
-        <div class="info-row">
-          <span class="info-label">سيرفر الموبايل:</span>
-          <span id="server-url" class="info-value">--</span>
-        </div>
-        <div class="info-row">
-          <span class="info-label">الجهاز المتصل:</span>
-          <span id="connected-device" class="info-value">لا يوجد</span>
+        <div class="card-glass-specular"></div>
+
+        <div class="info-grid">
+          <div class="info-tile">
+            <span class="tile-icon">📶</span>
+            <div class="tile-content">
+              <span class="info-label">حالة الاتصال</span>
+              <span id="conn-status" class="status-badge disconnected">غير متصل</span>
+            </div>
+          </div>
+
+          <div class="info-tile">
+            <span class="tile-icon">📺</span>
+            <div class="tile-content">
+              <span class="info-label">عنوان الشاشة</span>
+              <span id="tv-ip" class="info-value">جاري القراءة...</span>
+            </div>
+          </div>
+
+          <div class="info-tile">
+            <span class="tile-icon">⚡</span>
+            <div class="tile-content">
+              <span class="info-label">سيرفر الاستقبال</span>
+              <span id="server-url" class="info-value">--</span>
+            </div>
+          </div>
+
+          <div class="info-tile">
+            <span class="tile-icon">📱</span>
+            <div class="tile-content">
+              <span class="info-label">الجهاز المرتبط</span>
+              <span id="connected-device" class="info-value">في انتظار البث</span>
+            </div>
+          </div>
         </div>
       </div>
 
-      <div class="dhikr">
-        سبحان الله وبحمده سبحان الله العظيم
+      <div class="dhikr-container">
+        <span class="dhikr-sparkle">✦</span>
+        <span class="dhikr-text">سُبْحَانَ اللَّهِ وَبِحَمْدِهِ ، سُبْحَانَ اللَّهِ الْعَظِيمِ</span>
+        <span class="dhikr-sparkle">✦</span>
       </div>
     </div>
   </div>
@@ -52,7 +89,7 @@
     <img id="tv-image" alt="AboEzzat Media" />
   </div>
 
-  <!-- شريط تقدم التشغيل -->
+  <!-- شريط تقدم التشغيل السينمائي -->
   <div id="player-controls" class="controls-hidden">
     <div class="progress-bar-container">
       <div id="progress-bar"></div>
