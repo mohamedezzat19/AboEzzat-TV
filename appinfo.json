@@ -1,0 +1,13 @@
+{
+  "id": "com.aboezzat.tv",
+  "version": "1.0.0",
+  "vendor": "AboEzzat",
+  "type": "web",
+  "main": "index.html",
+  "title": "AboEzzat TV",
+  "icon": "icon.png",
+  "largeIcon": "icon.png",
+  "requiredPermissions": [
+    "network"
+  ]
+}
