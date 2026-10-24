@@ -1,0 +1,10 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<widget xmlns="http://www.w3.org/ns/widgets" xmlns:tizen="http://tizen.org/ns/widgets" id="http://aboezzat.com/tv" version="1.0.0" viewmodes="fullscreen">
+  <access origin="*" subdomains="true"/>
+  <tizen:application id="AboEzzat.TV" exec="index.html" package="AboEzzat" restart="never"/>
+  <content src="index.html"/>
+  <feature name="http://tizen.org/feature/screen.size.all"/>
+  <feature name="http://tizen.org/feature/network.internet"/>
+  <name>AboEzzat TV</name>
+  <icon src="icon.png"/>
+</widget>
