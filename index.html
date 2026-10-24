@@ -9,23 +9,50 @@
   <script src="hls.min.js"></script>
 </head>
 <body>
-  <div id="status-overlay" class="fade-out">
-    <div class="status-box">
-      <div id="status-indicator" class="disconnected"></div>
-      <span id="status-text">جاري الاتصال...</span>
+
+  <!-- شاشة الترحيب والمعلومات -->
+  <div id="welcome-screen">
+    <div class="welcome-box">
+      <h1 class="main-title">أهلاً بك يا أبو عزت</h1>
+      
+      <div class="info-card">
+        <div class="info-row">
+          <span class="info-label">حالة الاتصال:</span>
+          <span id="conn-status" class="status-badge disconnected">غير متصل</span>
+        </div>
+        <div class="info-row">
+          <span class="info-label">عنوان الشاشة (IP):</span>
+          <span id="tv-ip" class="info-value">جاري القراءة...</span>
+        </div>
+        <div class="info-row">
+          <span class="info-label">سيرفر الموبايل:</span>
+          <span id="server-url" class="info-value">--</span>
+        </div>
+        <div class="info-row">
+          <span class="info-label">الجهاز المتصل:</span>
+          <span id="connected-device" class="info-value">لا يوجد</span>
+        </div>
+      </div>
+
+      <div class="dhikr">
+        سبحان الله وبحمده سبحان الله العظيم
+      </div>
     </div>
   </div>
 
+  <!-- تنبيه الأوامر السريع (OSD) -->
   <div id="osd-banner" class="osd-hidden">
     <div id="osd-message"></div>
   </div>
 
+  <!-- حاوية الميديا -->
   <div id="media-container">
     <video id="tv-player" playsinline preload="auto"></video>
     <audio id="tv-audio-track" preload="auto"></audio>
     <img id="tv-image" alt="AboEzzat Media" />
   </div>
 
+  <!-- شريط تقدم التشغيل -->
   <div id="player-controls" class="controls-hidden">
     <div class="progress-bar-container">
       <div id="progress-bar"></div>
