@@ -1,0 +1,38 @@
+name: Build TV Packages (webOS & Tizen)
+
+on:
+  workflow_dispatch:
+  push:
+    branches: [ "main" ]
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout Code
+        uses: actions/checkout@v4
+
+      # تجهيز مجلد المخرجات وتنزيل حزمة HLS الكاملة بدون كسر السياسات
+      - name: Prepare Assets
+        run: |
+          mkdir -p output
+          curl -sL https://cdn.jsdelivr.net/npm/hls.js@1.5.8/dist/hls.min.js -o hls.min.js
+
+      # 1. تثبيت أدوات LG وبناء حزمة .ipk
+      - name: Build LG webOS (.ipk)
+        run: |
+          npm install -g @webos-tools/cli
+          ares-package ./ -o ./output/ -e ".git*" -e ".github*" -e "output*"
+
+      # 2. بناء حزمة Samsung Tizen (.wgt)
+      - name: Build Samsung Tizen (.wgt)
+        run: |
+          zip -r ./output/com.aboezzat.tv.wgt index.html style.css app.js hls.min.js config.xml app_icon.png
+
+      # 3. رفع ملفات التثبيت لتنزيلها مباشرة
+      - name: Upload TV Artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: AboEzzat-TV-Installers
+          path: output/
