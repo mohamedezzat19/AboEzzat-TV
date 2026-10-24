@@ -1,0 +1,40 @@
+<!DOCTYPE html>
+<html lang="ar" dir="rtl">
+<head>
+  <meta charset="UTF-8">
+  <meta http-equiv="X-UA-Compatible" content="IE=edge">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>AboEzzat TV</title>
+  <link rel="stylesheet" href="style.css">
+  <script src="hls.min.js"></script>
+</head>
+<body>
+  <div id="status-overlay" class="fade-out">
+    <div class="status-box">
+      <div id="status-indicator" class="disconnected"></div>
+      <span id="status-text">جاري الاتصال...</span>
+    </div>
+  </div>
+
+  <div id="osd-banner" class="osd-hidden">
+    <div id="osd-message"></div>
+  </div>
+
+  <div id="media-container">
+    <video id="tv-player" playsinline preload="auto"></video>
+    <audio id="tv-audio-track" preload="auto"></audio>
+    <img id="tv-image" alt="AboEzzat Media" />
+  </div>
+
+  <div id="player-controls" class="controls-hidden">
+    <div class="progress-bar-container">
+      <div id="progress-bar"></div>
+    </div>
+    <div class="time-display">
+      <span id="current-time">00:00:00</span> / <span id="total-duration">00:00:00</span>
+    </div>
+  </div>
+
+  <script src="app.js"></script>
+</body>
+</html>
