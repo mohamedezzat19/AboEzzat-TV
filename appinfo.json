@@ -5,8 +5,8 @@
   "type": "web",
   "main": "index.html",
   "title": "AboEzzat TV",
-  "icon": "icon.png",
-  "largeIcon": "icon.png",
+  "icon": "app_icon.png",
+  "largeIcon": "app_icon.png",
   "requiredPermissions": [
     "network"
   ]
