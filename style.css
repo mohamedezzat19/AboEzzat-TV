@@ -1,0 +1,173 @@
+* {
+  margin: 0;
+  padding: 0;
+  box-sizing: border-box;
+  user-select: none;
+}
+
+body, html {
+  width: 100%;
+  height: 100%;
+  background-color: #0d0e12;
+  overflow: hidden;
+  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Cairo", Arial, sans-serif;
+  color: #ffffff;
+}
+
+/* واجهة الترحيب والمعلومات */
+#welcome-screen {
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 100vw;
+  height: 100vh;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  z-index: 10;
+  background: radial-gradient(circle at center, #1a1d24 0%, #0d0e12 100%);
+  transition: opacity 0.5s ease;
+}
+
+.welcome-box {
+  text-align: center;
+  max-width: 800px;
+  width: 90%;
+}
+
+.main-title {
+  font-size: 48px;
+  margin-bottom: 30px;
+  color: #00e676;
+  text-shadow: 0 0 20px rgba(0, 230, 118, 0.4);
+}
+
+.info-card {
+  background: rgba(25, 28, 36, 0.9);
+  border: 1px solid #333a46;
+  border-radius: 16px;
+  padding: 25px 35px;
+  margin-bottom: 35px;
+  box-shadow: 0 10px 30px rgba(0, 0, 0, 0.5);
+}
+
+.info-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 12px 0;
+  border-bottom: 1px solid #252a33;
+  font-size: 20px;
+}
+
+.info-row:last-child {
+  border-bottom: none;
+}
+
+.info-label {
+  color: #a0aec0;
+}
+
+.info-value {
+  color: #ffffff;
+  font-weight: 500;
+  direction: ltr;
+}
+
+.status-badge {
+  padding: 4px 14px;
+  border-radius: 20px;
+  font-size: 16px;
+}
+
+.connected { background-color: rgba(0, 230, 118, 0.2); color: #00e676; border: 1px solid #00e676; }
+.disconnected { background-color: rgba(255, 23, 68, 0.2); color: #ff1744; border: 1px solid #ff1744; }
+.connecting { background-color: rgba(255, 234, 0, 0.2); color: #ffea00; border: 1px solid #ffea00; }
+
+.dhikr {
+  font-size: 26px;
+  color: #e2e8f0;
+  letter-spacing: 1px;
+  padding: 12px 25px;
+  background: rgba(255, 255, 255, 0.05);
+  border-radius: 30px;
+  display: inline-block;
+}
+
+/* حاوية الميديا */
+#media-container {
+  width: 100vw;
+  height: 100vh;
+  position: absolute;
+  top: 0;
+  left: 0;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  background-color: #000000;
+  z-index: 5;
+}
+
+#tv-player, #tv-image {
+  max-width: 100%;
+  max-height: 100%;
+  width: 100%;
+  height: 100%;
+  object-fit: contain;
+  display: none;
+}
+
+/* إشعارات الأوامر */
+#osd-banner {
+  position: absolute;
+  top: 40px;
+  left: 40px;
+  background: rgba(0, 0, 0, 0.85);
+  border: 1px solid #444;
+  color: #fff;
+  padding: 12px 24px;
+  border-radius: 8px;
+  font-size: 20px;
+  z-index: 999;
+  transition: opacity 0.3s ease;
+}
+
+/* شريط التحكم */
+#player-controls {
+  position: absolute;
+  bottom: 40px;
+  left: 5%;
+  width: 90%;
+  background: rgba(15, 15, 15, 0.85);
+  padding: 15px 25px;
+  border-radius: 12px;
+  z-index: 999;
+  transition: opacity 0.4s ease;
+}
+
+.progress-bar-container {
+  width: 100%;
+  height: 8px;
+  background: #333;
+  border-radius: 4px;
+  overflow: hidden;
+  margin-bottom: 8px;
+}
+
+#progress-bar {
+  width: 0%;
+  height: 100%;
+  background: #00e676;
+  transition: width 0.25s linear;
+}
+
+.time-display {
+  color: #ddd;
+  font-size: 14px;
+  direction: ltr;
+  text-align: right;
+}
+
+.hidden { display: none !important; }
+.osd-hidden { opacity: 0; pointer-events: none; }
+.controls-hidden { opacity: 0; pointer-events: none; }
