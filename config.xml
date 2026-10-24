@@ -6,5 +6,5 @@
   <feature name="http://tizen.org/feature/screen.size.all"/>
   <feature name="http://tizen.org/feature/network.internet"/>
   <name>AboEzzat TV</name>
-  <icon src="icon.png"/>
+  <icon src="app_icon.png"/>
 </widget>
