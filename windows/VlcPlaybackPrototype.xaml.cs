@@ -62,6 +62,16 @@ public partial class VlcPlaybackPrototype : UserControl, IDisposable
 
     public IReadOnlyDictionary<string, string>? RequestHeaders { get; set; }
 
+    public UIElement? OverlayContent
+    {
+        get => OverlayHost.Children.Count > 0 ? OverlayHost.Children[0] as UIElement : null;
+        set
+        {
+            OverlayHost.Children.Clear();
+            if (value is not null) OverlayHost.Children.Add(value);
+        }
+    }
+
     public TimeSpan Position
     {
         get => TimeSpan.FromMilliseconds(Math.Max(0, _mediaPlayer.Time));
@@ -109,14 +119,6 @@ public partial class VlcPlaybackPrototype : UserControl, IDisposable
             _mediaPlayer.Mute = _isMuted;
             _mediaPlayer.Play(_currentMedia);
         }
-    }
-
-    public bool Play(Uri uri, IReadOnlyDictionary<string, string>? headers = null)
-    {
-        RequestHeaders = headers;
-        Source = uri;
-        Play();
-        return _mediaPlayer.IsPlaying;
     }
 
     public void Pause() => _mediaPlayer.Pause();
