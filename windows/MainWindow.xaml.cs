@@ -198,8 +198,13 @@ public partial class MainWindow : Window
         {
             if (IsImageUrl(videoUri))
             {
+                _imageSlideshowTimer.Stop();
+                _imagePlaylist.Clear();
+                _imageIndex = 0;
+                _imageSlideshowEnabled = false;
                 StopAudioDeck();
                 ShowImage(videoUri);
+                UpdateImageControls();
             }
             else
             {
@@ -768,8 +773,9 @@ public partial class MainWindow : Window
 
     private void ImageSlideshow_Click(object sender, RoutedEventArgs e)
     {
+        if (_imagePlaylist.Count < 2) return;
         _imageSlideshowEnabled = !_imageSlideshowEnabled;
-        if (_imageSlideshowEnabled && _imagePlaylist.Count > 1) _imageSlideshowTimer.Start();
+        if (_imageSlideshowEnabled) _imageSlideshowTimer.Start();
         else _imageSlideshowTimer.Stop();
         UpdateImageControls();
     }
