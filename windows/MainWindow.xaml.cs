@@ -158,7 +158,8 @@ public partial class MainWindow : Window
             await ctx.Response.OutputStream.WriteAsync(responseBytes);
 
             if (command is "ping" or "status") return;
-            if (accepted && (!string.IsNullOrWhiteSpace(mediaUrl) || !string.IsNullOrWhiteSpace(audioUrl)))
+            if (accepted && (!string.IsNullOrWhiteSpace(mediaUrl)
+                || !string.IsNullOrWhiteSpace(audioUrl) || imageUrls.Count > 0))
             {
                 var video = mediaUrl;
                 var audio = audioUrl;
