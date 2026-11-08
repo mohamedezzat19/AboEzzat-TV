@@ -98,7 +98,7 @@ public sealed class VlcAudioPlayback : IDisposable
         long targetMilliseconds = (long)Math.Max(0, startAt.TotalMilliseconds);
         if (targetMilliseconds > 0)
         {
-            EventHandler? onPlaying = null;
+            EventHandler<EventArgs>? onPlaying = null;
             onPlaying = (_, _) =>
             {
                 if (onPlaying is not null) _player.Playing -= onPlaying;
