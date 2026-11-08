@@ -19,6 +19,11 @@ public partial class MainWindow : Window
     private CancellationTokenSource? _serverCts;
     private UdpClient? _discoveryClient;
     private bool _isFullscreen;
+    private readonly DispatcherTimer _imageSlideshowTimer = new() { Interval = TimeSpan.FromSeconds(5) };
+    private readonly List<Uri> _imagePlaylist = new();
+    private int _imageIndex;
+    private bool _imageSlideshowEnabled;
+
     private readonly DispatcherTimer _subtitleTimer = new() { Interval = TimeSpan.FromMilliseconds(200) };
     private readonly DispatcherTimer _controlsTimer = new() { Interval = TimeSpan.FromMilliseconds(500) };
     private readonly DispatcherTimer _controlsHideTimer = new() { Interval = TimeSpan.FromSeconds(4) };
@@ -52,6 +57,7 @@ public partial class MainWindow : Window
         _controlsTimer.Tick += (_, _) => UpdatePlaybackControls();
         _controlsHideTimer.Tick += (_, _) => HidePlaybackControlsIfNeeded();
         _resumeSaveTimer.Tick += (_, _) => SaveCurrentResumePosition();
+        _imageSlideshowTimer.Tick += (_, _) => AdvanceImage(1);
         Closed += (_, _) => { SaveCurrentResumePosition(); SaveResumePositions(); StopServer(); };
     }
 
@@ -102,6 +108,7 @@ public partial class MainWindow : Window
     private async Task HandleHttpRequestAsync(HttpListenerContext ctx)
     {
         string? mediaUrl = null, audioUrl = null, command = null;
+        List<string> imageUrls = new();
         try
         {
             var request = ctx.Request;
@@ -114,6 +121,11 @@ public partial class MainWindow : Window
                 var root = json.RootElement;
                 if (root.TryGetProperty("url", out var u)) mediaUrl = u.GetString();
                 if (root.TryGetProperty("audio", out var a)) audioUrl = a.GetString();
+                if (root.TryGetProperty("images", out var images) && images.ValueKind == JsonValueKind.Array)
+                    imageUrls.AddRange(images.EnumerateArray()
+                        .Where(x => x.ValueKind == JsonValueKind.String)
+                        .Select(x => x.GetString()!)
+                        .Where(IsHttpUrl));
             }
             else
             {
@@ -121,12 +133,15 @@ public partial class MainWindow : Window
                 mediaUrl = q["url"] ?? q["video"];
                 audioUrl = q["audio"];
                 command = q["command"];
+                if (!string.IsNullOrWhiteSpace(q["images"]))
+                    imageUrls.AddRange(q["images"].Split('|').Where(IsHttpUrl));
             }
 
             bool valid = (string.IsNullOrWhiteSpace(mediaUrl) || IsHttpUrl(mediaUrl))
                 && (string.IsNullOrWhiteSpace(audioUrl) || IsHttpUrl(audioUrl));
-            bool accepted = command is "ping" or "status" || valid
-                && (!string.IsNullOrWhiteSpace(mediaUrl) || !string.IsNullOrWhiteSpace(audioUrl));
+            bool imagesValid = imageUrls.All(IsHttpUrl);
+            bool accepted = command is "ping" or "status" || valid && imagesValid
+                && (!string.IsNullOrWhiteSpace(mediaUrl) || !string.IsNullOrWhiteSpace(audioUrl) || imageUrls.Count > 0);
 
             string responseText = accepted ? "OK" : "Invalid or unsupported request";
             string contentType = "text/plain; charset=utf-8";
@@ -147,7 +162,12 @@ public partial class MainWindow : Window
             {
                 var video = mediaUrl;
                 var audio = audioUrl;
-                Dispatcher.Invoke(() => ReceiveMedia(video, audio));
+                var images = imageUrls.ToArray();
+                Dispatcher.Invoke(() =>
+                {
+                    if (images.Length > 0) StartImagePlaylist(images);
+                    else ReceiveMedia(video, audio);
+                });
             }
         }
         catch (Exception ex)
@@ -722,6 +742,56 @@ public partial class MainWindow : Window
         MediaPanel.CornerRadius = new CornerRadius(18);
     }
 
+    private void StartImagePlaylist(IEnumerable<string> urls)
+    {
+        _imageSlideshowTimer.Stop();
+        _imagePlaylist.Clear();
+        _imagePlaylist.AddRange(urls.Where(IsHttpUrl).Select(x => new Uri(x)).Where(IsImageUrl));
+        if (_imagePlaylist.Count == 0) return;
+        _imageIndex = 0;
+        ShowImage(_imagePlaylist[_imageIndex]);
+        _imageSlideshowEnabled = _imagePlaylist.Count > 1;
+        if (_imageSlideshowEnabled) _imageSlideshowTimer.Start();
+        UpdateImageControls();
+    }
+
+    private void AdvanceImage(int direction)
+    {
+        if (_imagePlaylist.Count == 0) return;
+        _imageIndex = (_imageIndex + direction + _imagePlaylist.Count) % _imagePlaylist.Count;
+        ShowImage(_imagePlaylist[_imageIndex]);
+        UpdateImageControls();
+    }
+
+    private void ImagePrevious_Click(object sender, RoutedEventArgs e) => AdvanceImage(-1);
+    private void ImageNext_Click(object sender, RoutedEventArgs e) => AdvanceImage(1);
+
+    private void ImageSlideshow_Click(object sender, RoutedEventArgs e)
+    {
+        _imageSlideshowEnabled = !_imageSlideshowEnabled;
+        if (_imageSlideshowEnabled && _imagePlaylist.Count > 1) _imageSlideshowTimer.Start();
+        else _imageSlideshowTimer.Stop();
+        UpdateImageControls();
+    }
+
+    private void ImageInterval_SelectionChanged(object sender, System.Windows.Controls.SelectionChangedEventArgs e)
+    {
+        if (ImageInterval.SelectedItem is System.Windows.Controls.ComboBoxItem item
+            && int.TryParse(item.Tag?.ToString(), out int seconds))
+        {
+            _imageSlideshowTimer.Interval = TimeSpan.FromSeconds(seconds);
+        }
+    }
+
+    private void UpdateImageControls()
+    {
+        if (ImageControls == null) return;
+        ImageControls.Visibility = _imagePlaylist.Count > 0 && ReceivedImage.Visibility == Visibility.Visible
+            ? Visibility.Visible : Visibility.Collapsed;
+        ImagePositionText.Text = _imagePlaylist.Count == 0 ? "" : $"{_imageIndex + 1} / {_imagePlaylist.Count}";
+        ImageSlideshowButton.Content = _imageSlideshowEnabled ? "إيقاف العرض" : "تشغيل العرض";
+    }
+
     private void ShowImage(Uri uri)
     {
         ExpandMediaForPlayback();
@@ -757,6 +827,11 @@ public partial class MainWindow : Window
         VideoPlayer.Stop();
         VideoPlayer.Source = null;
         VideoPlayer.Visibility = Visibility.Collapsed;
+        _imageSlideshowTimer.Stop();
+        _imagePlaylist.Clear();
+        _imageIndex = 0;
+        _imageSlideshowEnabled = false;
+        UpdateImageControls();
         ReceivedImage.Source = null;
         ReceivedImage.Visibility = Visibility.Collapsed;
         WelcomePanel.Visibility = Visibility.Visible;
