@@ -754,6 +754,22 @@ public partial class MainWindow : Window
         _imagePlaylist.Clear();
         _imagePlaylist.AddRange(urls.Where(IsHttpUrl).Select(x => new Uri(x)).Where(IsImageUrl));
         if (_imagePlaylist.Count == 0) return;
+
+        // Switching from video/audio to images must stop the previous media deck.
+        SaveCurrentResumePosition();
+        _resumeSaveTimer.Stop();
+        _controlsTimer.Stop();
+        _controlsHideTimer.Stop();
+        PlaybackControls.Visibility = Visibility.Collapsed;
+        _subtitleTimer.Stop();
+        _subtitleLines.Clear();
+        SubtitleOverlay.Text = "";
+        SubtitleOverlay.Visibility = Visibility.Collapsed;
+        StopAudioDeck();
+        VideoPlayer.Stop();
+        VideoPlayer.Source = null;
+        VideoPlayer.Visibility = Visibility.Collapsed;
+        _currentVideoUrl = null;
         _imageIndex = 0;
         ShowImage(_imagePlaylist[_imageIndex]);
         _imageSlideshowEnabled = _imagePlaylist.Count > 1;
@@ -838,9 +854,9 @@ public partial class MainWindow : Window
         _imagePlaylist.Clear();
         _imageIndex = 0;
         _imageSlideshowEnabled = false;
-        UpdateImageControls();
         ReceivedImage.Source = null;
         ReceivedImage.Visibility = Visibility.Collapsed;
+        UpdateImageControls();
         WelcomePanel.Visibility = Visibility.Visible;
     }
 
