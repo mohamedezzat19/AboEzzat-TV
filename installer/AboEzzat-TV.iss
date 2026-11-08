@@ -35,6 +35,8 @@ Name: "{group}\AboEzzat TV"; Filename: "{app}\{#MyAppExeName}"
 Name: "{autodesktop}\AboEzzat TV"; Filename: "{app}\{#MyAppExeName}"; Tasks: desktopicon
 
 [Run]
+; Remove a stale reservation for this dedicated receiver endpoint before recreating it.
+Filename: "{sys}\netsh.exe"; Parameters: "http delete urlacl url=http://+:8081/"; Flags: runhidden waituntilterminated
 Filename: "{sys}\netsh.exe"; Parameters: "http add urlacl url=http://+:8081/ user=S-1-5-32-545"; Flags: runhidden waituntilterminated
 Filename: "{sys}\netsh.exe"; Parameters: "advfirewall firewall add rule name=""AboEzzat TV Receiver"" dir=in action=allow protocol=TCP localport=8081 profile=private"; Flags: runhidden waituntilterminated
 Filename: "{app}\{#MyAppExeName}"; Description: "Launch AboEzzat TV"; Flags: postinstall nowait skipifsilent
