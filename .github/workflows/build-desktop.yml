@@ -1,4 +1,4 @@
-name: Build AboEzzat TV Desktop
+name: Build AboEzzat TV Windows
 
 on:
   workflow_dispatch:
@@ -9,20 +9,7 @@ on:
 
 jobs:
   build:
-    strategy:
-      fail-fast: false
-      matrix:
-        include:
-          - os: windows-latest
-            builder_args: "--win nsis"
-            artifact: windows
-          - os: macos-latest
-            builder_args: "--mac dmg"
-            artifact: macos
-          - os: ubuntu-latest
-            builder_args: "--linux AppImage"
-            artifact: linux
-    runs-on: ${{ matrix.os }}
+    runs-on: windows-latest
     defaults:
       run:
         working-directory: desktop
@@ -35,11 +22,11 @@ jobs:
           node-version: 20
       - name: Install dependencies
         run: npm install
-      - name: Build desktop app
-        run: npx electron-builder ${{ matrix.builder_args }}
-      - name: Upload build artifact
+      - name: Build Windows app
+        run: npx electron-builder --win nsis
+      - name: Upload Windows build
         uses: actions/upload-artifact@v4
         with:
-          name: aboezzat-tv-${{ matrix.artifact }}
+          name: aboezzat-tv-windows
           path: desktop/dist/**
           if-no-files-found: error
