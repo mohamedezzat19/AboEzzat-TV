@@ -48,6 +48,7 @@ public partial class MainWindow : Window
     public MainWindow()
     {
         InitializeComponent();
+        VideoPlayer.OverlayContent = VideoOverlayLayer;
         LoadHistory();
         LoadResumePositions();
         RefreshHistoryList();
