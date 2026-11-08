@@ -14,8 +14,8 @@
    </StackPanel>
   </DockPanel>
   <Grid Grid.Row="1" Margin="0,14">
-   <Grid.ColumnDefinitions><ColumnDefinition Width="260"/><ColumnDefinition Width="14"/><ColumnDefinition Width="*"/></Grid.ColumnDefinitions>
-   <Border Grid.Column="0" Background="{StaticResource PanelBackground}" CornerRadius="18" Padding="22">
+   <Grid.ColumnDefinitions><ColumnDefinition x:Name="InfoColumn" Width="260"/><ColumnDefinition x:Name="GapColumn" Width="14"/><ColumnDefinition Width="*"/></Grid.ColumnDefinitions>
+   <Border x:Name="InfoPanel" Grid.Column="0" Background="{StaticResource PanelBackground}" CornerRadius="18" Padding="22">
     <StackPanel>
      <TextBlock Text="حالة الريسيفر" FontSize="23" FontWeight="Bold" Margin="0,12,0,20"/>
      <TextBlock x:Name="IpText" Text="جاري تحديد عنوان IP..." Foreground="#55D6D0" FontSize="16" TextWrapping="Wrap"/>
@@ -24,7 +24,7 @@
      <TextBlock Text="اكتشاف الأجهزة: UDP 37020" Margin="0,12,0,0"/>
     </StackPanel>
    </Border>
-   <Border Grid.Column="2" Background="#0D1634" CornerRadius="18" Padding="16">
+   <Border x:Name="MediaPanel" Grid.Column="2" Background="#0D1634" CornerRadius="18" Padding="8">
     <Grid>
      <MediaElement x:Name="VideoPlayer" LoadedBehavior="Manual" UnloadedBehavior="Stop"
                    Stretch="Uniform" MediaEnded="VideoPlayer_MediaEnded" Visibility="Collapsed"/>
