@@ -110,7 +110,26 @@ public sealed class VlcAudioPlayback : IDisposable
         _player.Play(_media);
     }
 
-    public void Pause() => _player.Pause();
+    public bool HasSource => _media is not null;
+
+    public void Pause()
+    {
+        if (!_disposed && _media is not null) _player.SetPause(true);
+    }
+
+    public void Resume()
+    {
+        if (!_disposed && _media is not null) _player.SetPause(false);
+    }
+
+    public void Seek(TimeSpan position)
+    {
+        if (_disposed || _media is null) return;
+        var milliseconds = Math.Max(0, position.TotalMilliseconds);
+        var length = _player.Length;
+        if (length > 0) milliseconds = Math.Min(milliseconds, length);
+        _player.Time = (long)milliseconds;
+    }
 
     public void Stop()
     {
