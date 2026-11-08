@@ -1,6 +1,7 @@
 <Window x:Class="AboEzzatReceiver.Windows.MainWindow"
  xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
  xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+ xmlns:local="clr-namespace:AboEzzatReceiver.Windows"
  Title="أبو عزت ريسيفر" Width="1280" Height="800" MinWidth="900" MinHeight="600"
  Focusable="True" PreviewKeyDown="Window_PreviewKeyDown"
  WindowStartupLocation="CenterScreen" Background="{StaticResource AppBackground}"
@@ -30,8 +31,8 @@
    </Border>
    <Border x:Name="MediaPanel" Grid.Column="2" Background="#0D1634" CornerRadius="18" Padding="8" MouseMove="MediaPanel_MouseMove">
     <Grid>
-     <MediaElement x:Name="VideoPlayer" LoadedBehavior="Manual" UnloadedBehavior="Stop"
-                   Stretch="Uniform" MediaOpened="VideoPlayer_MediaOpened" MediaEnded="VideoPlayer_MediaEnded" Visibility="Collapsed"/>
+     <local:VlcPlaybackPrototype x:Name="VideoPlayer" Stretch="Uniform"
+                   MediaOpened="VideoPlayer_MediaOpened" MediaEnded="VideoPlayer_MediaEnded" Visibility="Collapsed"/>
      <!-- Hidden second deck for separately supplied Cast audio. -->
      <MediaElement x:Name="AudioPlayer" Width="1" Height="1" Opacity="0" IsHitTestVisible="False"
                    LoadedBehavior="Manual" UnloadedBehavior="Stop" Visibility="Visible"/>
