@@ -45,6 +45,23 @@ public sealed class VlcAudioPlayback : IDisposable
         }
     }
 
+    /// <summary>
+    /// Current playback position, exposed in the same units as WPF MediaElement.
+    /// VLC reports and accepts the position in milliseconds.
+    /// </summary>
+    public TimeSpan Position
+    {
+        get => TimeSpan.FromMilliseconds(Math.Max(0, _player.Time));
+        set
+        {
+            ThrowIfDisposed();
+            var milliseconds = Math.Max(0, value.TotalMilliseconds);
+            var length = _player.Length;
+            if (length > 0) milliseconds = Math.Min(milliseconds, length);
+            _player.Time = (long)milliseconds;
+        }
+    }
+
     public double Volume
     {
         get => _volume;
