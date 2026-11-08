@@ -20,8 +20,18 @@ jobs:
         uses: actions/setup-node@v4
         with:
           node-version: 20
-      - name: Install dependencies
-        run: npm install
+      - name: Install dependencies (retry transient download failures)
+        shell: pwsh
+        run: |
+          $attempt = 1
+          while ($attempt -le 3) {
+            npm install
+            if ($LASTEXITCODE -eq 0) { exit 0 }
+            if ($attempt -eq 3) { exit $LASTEXITCODE }
+            Write-Host "npm install failed (attempt $attempt). Waiting 20 seconds before retry..."
+            Start-Sleep -Seconds 20
+            $attempt++
+          }
       - name: Build Windows app
         run: npx electron-builder --win nsis
       - name: Upload Windows build
