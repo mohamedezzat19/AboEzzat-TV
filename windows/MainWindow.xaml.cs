@@ -308,37 +308,20 @@ public partial class MainWindow : Window
 
     private static List<(TimeSpan Start, TimeSpan End, string Text)> ParseSrt(string subtitleText)
     {
-        // Normalize Windows, Unix and old-Mac line endings before splitting.
-        string normalized = subtitleText.TrimStart('\uFEFF')
-            .Replace("\\r\\n", "\\n").Replace('\\r', '\\n');
+        string normalized = subtitleText.TrimStart('\uFEFF').Replace("\r\n", "\n").Replace('\r', '\n');
         var list = new List<(TimeSpan Start, TimeSpan End, string Text)>();
-        var blocks = Regex.Split(normalized, @"\\n\\s*\\n");
-
+        var blocks = Regex.Split(normalized, @"\n\s*\n");
         foreach (var block in blocks)
         {
-            // Accept SRT and WebVTT timestamp lines (VTT may include cue settings).
-            var match = Regex.Match(block,
-                @"(?<start>\\d{2}:\\d{2}:\\d{2}[,.]\\d{3})\\s*-->\\s*(?<end>\\d{2}:\\d{2}:\\d{2}[,.]\\d{3})");
+            var match = Regex.Match(block, @"(?<start>\d{2}:\d{2}:\d{2}[,.]\d{3})\s*-->\s*(?<end>\d{2}:\d{2}:\d{2}[,.]\d{3})");
             if (!match.Success) continue;
-
-            if (!TimeSpan.TryParse(match.Groups["start"].Value.Replace(',', '.'),
-                    System.Globalization.CultureInfo.InvariantCulture, out var start)
-                || !TimeSpan.TryParse(match.Groups["end"].Value.Replace(',', '.'),
-                    System.Globalization.CultureInfo.InvariantCulture, out var end)
-                || end <= start) continue;
-
+            if (!TimeSpan.TryParse(match.Groups["start"].Value.Replace(',', '.'), System.Globalization.CultureInfo.InvariantCulture, out var start)
+                || !TimeSpan.TryParse(match.Groups["end"].Value.Replace(',', '.'), System.Globalization.CultureInfo.InvariantCulture, out var end) || end <= start) continue;
             string text = block[(match.Index + match.Length)..];
-            // Remove cue settings and common subtitle markup, retaining readable text.
-            text = Regex.Replace(text, @"(?m)^\\s*\\d+\\s*$", "");
-            text = Regex.Replace(text, @"<[^>]+>", "");
-            text = Regex.Replace(text, @"(?m)^\\s*\\{\\\\an[1-9]\\}\\s*", "");
-            text = Regex.Replace(text, @"[ \\t]+(?=\\n)", "");
-            text = text.Trim();
-
-            if (!string.IsNullOrWhiteSpace(text))
-                list.Add((start, end, text));
+            text = Regex.Replace(text, @"(?m)^\s*\d+\s*$", "");
+            text = Regex.Replace(text, @"<[^>]+>", "").Trim();
+            if (!string.IsNullOrWhiteSpace(text)) list.Add((start, end, text));
         }
-
         return list.OrderBy(x => x.Start).ToList();
     }
 
