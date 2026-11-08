@@ -1,0 +1,13 @@
+{
+  "name": "aboezzat-tv-desktop",
+  "version": "0.1.0",
+  "private": true,
+  "description": "AboEzzat TV desktop receiver prototype",
+  "main": "main.js",
+  "scripts": {
+    "start": "electron ."
+  },
+  "devDependencies": {
+    "electron": "^33.2.1"
+  }
+}
