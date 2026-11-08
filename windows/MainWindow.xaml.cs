@@ -1,5 +1,7 @@
 using System.Net;
 using System.Net.Sockets;
+using System.Text;
+using System.Text.Json;
 using System.Windows;
 using System.Windows.Media;
 using System.Windows.Media.Imaging;
@@ -8,8 +10,12 @@ namespace AboEzzatReceiver.Windows;
 
 public partial class MainWindow : Window
 {
+    private const int ReceiverPort = 8081;
+    private const int DiscoveryPort = 37020;
+    private const string DiscoveryGroup = "239.255.42.99";
     private HttpListener? _listener;
     private CancellationTokenSource? _serverCts;
+    private UdpClient? _discoveryClient;
     private bool _isFullscreen;
     private bool _isMediaExpanded;
     private WindowStyle _savedStyle;
@@ -19,7 +25,7 @@ public partial class MainWindow : Window
     public MainWindow()
     {
         InitializeComponent();
-        IpText.Text = $"{GetLocalIPv4()}:8081";
+        IpText.Text = $"{GetLocalIPv4()}:{ReceiverPort}";
         Loaded += async (_, _) => await StartServerAsync();
         Closed += (_, _) => StopServer();
     }
@@ -41,13 +47,14 @@ public partial class MainWindow : Window
         {
             _serverCts = new CancellationTokenSource();
             _listener = new HttpListener();
-            _listener.Prefixes.Add("http://+:8081/");
+            _listener.Prefixes.Add($"http://+:{ReceiverPort}/");
             _listener.Start();
             _ = Task.Run(() => ListenLoopAsync(_serverCts.Token));
+            _ = Task.Run(() => DiscoveryLoopAsync(_serverCts.Token));
         }
         catch (Exception ex)
         {
-            MessageBox.Show($"تعذّر تشغيل منفذ 8081. قد يكون مستخدمًا أو يحتاج صلاحية.\n{ex.Message}",
+            MessageBox.Show($"تعذّر تشغيل منفذ {ReceiverPort}. قد يكون مستخدمًا أو يحتاج صلاحية.\n{ex.Message}",
                 "AboEzzat Receiver", MessageBoxButton.OK, MessageBoxImage.Warning);
         }
     }
@@ -58,30 +65,124 @@ public partial class MainWindow : Window
         {
             HttpListenerContext ctx;
             try { ctx = await _listener.GetContextAsync(); }
-            catch (Exception) when (token.IsCancellationRequested) { break; }
+            catch when (token.IsCancellationRequested) { break; }
             catch { break; }
+            _ = Task.Run(() => HandleHttpRequestAsync(ctx));
+        }
+    }
 
-            _ = Task.Run(async () =>
+    // Compatible with Android Receiver's HTTP contract:
+    // POST /play {"url":"...","audio":"...","headers":{...}}
+    // GET /?url=... or /?video=...&audio=...; command=ping/status.
+    private async Task HandleHttpRequestAsync(HttpListenerContext ctx)
+    {
+        string? mediaUrl = null, audioUrl = null, command = null;
+        try
+        {
+            var request = ctx.Request;
+            if (request.HttpMethod.Equals("POST", StringComparison.OrdinalIgnoreCase)
+                && request.Url?.AbsolutePath.Equals("/play", StringComparison.OrdinalIgnoreCase) == true)
             {
-                try
-                {
-                    // Temporary generic test routes. Exact Cast protocol routes will be
-                    // ported after comparing them with the Android Receiver source.
-                    var path = ctx.Request.Url?.AbsolutePath.Trim('/').ToLowerInvariant() ?? "";
-                    var url = ctx.Request.QueryString["url"];
-                    if (path is "play" or "video" && Uri.TryCreate(url, UriKind.Absolute, out var mediaUri))
-                        Dispatcher.Invoke(() => PlayVideo(mediaUri));
-                    else if (path is "image" && Uri.TryCreate(url, UriKind.Absolute, out var imageUri))
-                        Dispatcher.Invoke(() => ShowImage(imageUri));
-                    var bytes = System.Text.Encoding.UTF8.GetBytes("AboEzzat Receiver Windows - OK");
-                    ctx.Response.StatusCode = 200;
-                    ctx.Response.ContentType = "text/plain; charset=utf-8";
-                    ctx.Response.ContentLength64 = bytes.Length;
-                    await ctx.Response.OutputStream.WriteAsync(bytes);
-                }
-                catch { try { ctx.Response.StatusCode = 500; } catch { } }
-                finally { try { ctx.Response.Close(); } catch { } }
-            });
+                using var reader = new StreamReader(request.InputStream, request.ContentEncoding);
+                var body = await reader.ReadToEndAsync();
+                using var json = JsonDocument.Parse(body);
+                var root = json.RootElement;
+                if (root.TryGetProperty("url", out var u)) mediaUrl = u.GetString();
+                if (root.TryGetProperty("audio", out var a)) audioUrl = a.GetString();
+            }
+            else
+            {
+                var q = request.QueryString;
+                mediaUrl = q["url"] ?? q["video"];
+                audioUrl = q["audio"];
+                command = q["command"];
+            }
+
+            bool valid = (string.IsNullOrWhiteSpace(mediaUrl) || IsHttpUrl(mediaUrl))
+                && (string.IsNullOrWhiteSpace(audioUrl) || IsHttpUrl(audioUrl));
+            bool accepted = command is "ping" or "status" || valid
+                && (!string.IsNullOrWhiteSpace(mediaUrl) || !string.IsNullOrWhiteSpace(audioUrl));
+
+            string responseText = accepted ? "OK" : "Invalid or unsupported request";
+            string contentType = "text/plain; charset=utf-8";
+            if (command == "status")
+            {
+                responseText = "{\"extracting\":false,\"attempt\":0,\"status\":\"ready\",\"message\":\"Windows Receiver ready\"}";
+                contentType = "application/json; charset=utf-8";
+            }
+
+            ctx.Response.StatusCode = accepted ? 200 : 400;
+            ctx.Response.ContentType = contentType;
+            var responseBytes = Encoding.UTF8.GetBytes(responseText);
+            ctx.Response.ContentLength64 = responseBytes.Length;
+            await ctx.Response.OutputStream.WriteAsync(responseBytes);
+
+            if (command is "ping" or "status") return;
+            if (accepted && (!string.IsNullOrWhiteSpace(mediaUrl) || !string.IsNullOrWhiteSpace(audioUrl)))
+            {
+                var video = mediaUrl;
+                var audio = audioUrl;
+                Dispatcher.Invoke(() => ReceiveMedia(video, audio));
+            }
+        }
+        catch (Exception ex)
+        {
+            try
+            {
+                ctx.Response.StatusCode = 400;
+                var bytes = Encoding.UTF8.GetBytes("Invalid request");
+                ctx.Response.ContentLength64 = bytes.Length;
+                await ctx.Response.OutputStream.WriteAsync(bytes);
+            }
+            catch { }
+            System.Diagnostics.Debug.WriteLine($"Receiver request error: {ex}");
+        }
+        finally { try { ctx.Response.Close(); } catch { } }
+    }
+
+    private static bool IsHttpUrl(string? value) =>
+        Uri.TryCreate(value, UriKind.Absolute, out var uri)
+        && (uri.Scheme == Uri.UriSchemeHttp || uri.Scheme == Uri.UriSchemeHttps);
+
+    private void ReceiveMedia(string? videoUrl, string? audioUrl)
+    {
+        // Android Cast sends visual/audio separately within a short window.
+        // First stage: accept the protocol and play each direct URL; source mixing
+        // will be added with the dedicated Windows media engine.
+        if (!string.IsNullOrWhiteSpace(videoUrl) && IsHttpUrl(videoUrl))
+        {
+            if (Uri.TryCreate(videoUrl, UriKind.Absolute, out var uri))
+            {
+                if (IsImageUrl(uri)) ShowImage(uri);
+                else PlayVideo(uri);
+            }
+        }
+        else if (!string.IsNullOrWhiteSpace(audioUrl) && Uri.TryCreate(audioUrl, UriKind.Absolute, out var audioUri))
+        {
+            PlayVideo(audioUri);
+        }
+    }
+
+    private static bool IsImageUrl(Uri uri)
+    {
+        var path = uri.AbsolutePath.ToLowerInvariant();
+        return path.EndsWith(".jpg") || path.EndsWith(".jpeg") || path.EndsWith(".png")
+            || path.EndsWith(".webp") || path.EndsWith(".gif") || path.EndsWith(".bmp");
+    }
+
+    private async Task DiscoveryLoopAsync(CancellationToken token)
+    {
+        while (!token.IsCancellationRequested)
+        {
+            try
+            {
+                using var udp = new UdpClient();
+                udp.EnableBroadcast = true;
+                var data = Encoding.UTF8.GetBytes($"ABOEZZAT_RECEIVER|{GetLocalIPv4()}|{ReceiverPort}");
+                await udp.SendAsync(data, new IPEndPoint(IPAddress.Parse(DiscoveryGroup), DiscoveryPort));
+            }
+            catch (Exception ex) { System.Diagnostics.Debug.WriteLine($"Discovery heartbeat: {ex.Message}"); }
+            try { await Task.Delay(1200, token); } catch (OperationCanceledException) { break; }
         }
     }
 
@@ -93,9 +194,7 @@ public partial class MainWindow : Window
         VideoPlayer.Source = null;
         WelcomePanel.Visibility = Visibility.Collapsed;
         VideoPlayer.Visibility = Visibility.Visible;
-
-        // Give WPF MediaElement time to release the previous decoder/source.
-        await Task.Delay(120);
+        await Task.Delay(150);
         VideoPlayer.Source = uri;
         VideoPlayer.Position = TimeSpan.Zero;
         VideoPlayer.Play();
@@ -156,7 +255,7 @@ public partial class MainWindow : Window
     }
 
     private void Stop_Click(object sender, RoutedEventArgs e) => ShowHome();
-    private void VideoPlayer_MediaEnded(object sender, RoutedEventArgs e) { /* keep last frame until next request */ }
+    private void VideoPlayer_MediaEnded(object sender, RoutedEventArgs e) { }
 
     private void Fullscreen_Click(object sender, RoutedEventArgs e)
     {
