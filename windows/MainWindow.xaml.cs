@@ -18,6 +18,7 @@ public partial class MainWindow : Window
     private const int ReceiverPort = 8081;
     private const int DiscoveryPort = 37020;
     private const string DiscoveryGroup = "239.255.42.99";
+    private readonly VlcAudioPlayback AudioPlayer;
     private HttpListener? _listener;
     private CancellationTokenSource? _serverCts;
     private UdpClient? _discoveryClient;
@@ -51,6 +52,7 @@ public partial class MainWindow : Window
     public MainWindow()
     {
         InitializeComponent();
+        AudioPlayer = new VlcAudioPlayback();
         VideoPlayer.OverlayContent = VideoOverlayLayer;
         LoadHistory();
         LoadResumePositions();
@@ -62,7 +64,7 @@ public partial class MainWindow : Window
         _controlsHideTimer.Tick += (_, _) => HidePlaybackControlsIfNeeded();
         _resumeSaveTimer.Tick += (_, _) => SaveCurrentResumePosition();
         _imageSlideshowTimer.Tick += (_, _) => AdvanceImage(1);
-        Closed += (_, _) => { SaveCurrentResumePosition(); SaveResumePositions(); StopServer(); VideoPlayer.Dispose(); };
+        Closed += (_, _) => { SaveCurrentResumePosition(); SaveResumePositions(); StopServer(); StopAudioDeck(); AudioPlayer.Dispose(); VideoPlayer.Dispose(); };
     }
 
     private static string GetLocalIPv4()
