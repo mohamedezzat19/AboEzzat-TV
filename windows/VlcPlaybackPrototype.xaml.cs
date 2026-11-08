@@ -68,6 +68,8 @@ public partial class VlcPlaybackPrototype : UserControl, IDisposable
         set
         {
             OverlayHost.Children.Clear();
+            if (value is FrameworkElement element && element.Parent is Panel oldParent)
+                oldParent.Children.Remove(element);
             if (value is not null) OverlayHost.Children.Add(value);
         }
     }
