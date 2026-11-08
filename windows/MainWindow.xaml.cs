@@ -2,6 +2,8 @@ using System.Net;
 using System.Net.Sockets;
 using System.Text;
 using System.Text.Json;
+using System.Text.RegularExpressions;
+using System.Windows.Threading;
 using System.Windows;
 using System.Windows.Media;
 using System.Windows.Media.Imaging;
@@ -17,6 +19,8 @@ public partial class MainWindow : Window
     private CancellationTokenSource? _serverCts;
     private UdpClient? _discoveryClient;
     private bool _isFullscreen;
+    private readonly DispatcherTimer _subtitleTimer = new() { Interval = TimeSpan.FromMilliseconds(200) };
+    private List<(TimeSpan Start, TimeSpan End, string Text)> _subtitleLines = new();
     private bool _isMediaExpanded;
     private WindowStyle _savedStyle;
     private ResizeMode _savedResizeMode;
@@ -27,6 +31,7 @@ public partial class MainWindow : Window
         InitializeComponent();
         IpText.Text = $"{GetLocalIPv4()}:{ReceiverPort}";
         Loaded += async (_, _) => await StartServerAsync();
+        _subtitleTimer.Tick += (_, _) => UpdateSubtitleOverlay();
         Closed += (_, _) => StopServer();
     }
 
@@ -197,6 +202,124 @@ public partial class MainWindow : Window
         AudioPlayer.Source = null;
     }
 
+    private async void Subtitle_Click(object sender, RoutedEventArgs e)
+    {
+        if (VideoPlayer.Source == null || VideoPlayer.Visibility != Visibility.Visible)
+        {
+            MessageBox.Show("شغّل فيديو أولًا علشان نبحث عن الترجمة.", "الترجمة العربية");
+            return;
+        }
+
+        string title = GuessSubtitleTitle(VideoPlayer.Source);
+        if (string.IsNullOrWhiteSpace(title))
+        {
+            var dialog = new SubtitleTitleDialog();
+            if (dialog.ShowDialog() != true || string.IsNullOrWhiteSpace(dialog.TitleText)) return;
+            title = dialog.TitleText.Trim();
+        }
+
+        SubtitleButton.IsEnabled = false;
+        SubtitleButton.Content = "جاري البحث…";
+        try
+        {
+            using var http = new HttpClient { Timeout = TimeSpan.FromSeconds(25) };
+            string endpoint = "https://subtitles.website/strapi/api/search/subtitles?title="
+                + Uri.EscapeDataString(title) + "&language=ar&format=srt";
+            using var response = await http.GetAsync(endpoint);
+            response.EnsureSuccessStatusCode();
+            using var json = JsonDocument.Parse(await response.Content.ReadAsStringAsync());
+            var root = json.RootElement;
+            JsonElement results;
+            if (!root.TryGetProperty("data", out results) && !root.TryGetProperty("subtitles", out results))
+                throw new InvalidOperationException("ملف الترجمة غير متاح في نتائج البحث.");
+
+            string? downloadUrl = null;
+            int bestDownloads = -1;
+            foreach (var item in results.EnumerateArray())
+            {
+                string candidate = GetJsonString(item, "download_url");
+                if (string.IsNullOrWhiteSpace(candidate)) candidate = GetJsonString(item, "url");
+                if (string.IsNullOrWhiteSpace(candidate)) continue;
+                int downloads = item.TryGetProperty("downloads", out var d) && d.TryGetInt32(out var n) ? n : 0;
+                if (downloadUrl == null || downloads > bestDownloads) { downloadUrl = candidate; bestDownloads = downloads; }
+            }
+            if (downloadUrl == null) throw new InvalidOperationException("ملقيناش ترجمة عربية للفيديو ده.");
+            if (downloadUrl.StartsWith("/")) downloadUrl = "https://subtitles.website" + downloadUrl;
+            else if (!downloadUrl.StartsWith("http", StringComparison.OrdinalIgnoreCase))
+                downloadUrl = "https://subtitles.website/" + downloadUrl;
+
+            var subtitleBytes = await http.GetByteArrayAsync(downloadUrl);
+            string subtitleText;
+            if (subtitleBytes.Length >= 2 && subtitleBytes[0] == (byte)'P' && subtitleBytes[1] == (byte)'K')
+            {
+                using var zipStream = new MemoryStream(subtitleBytes);
+                using var archive = new System.IO.Compression.ZipArchive(zipStream);
+                var entry = archive.Entries.FirstOrDefault(e => e.FullName.EndsWith(".srt", StringComparison.OrdinalIgnoreCase));
+                if (entry == null) throw new InvalidOperationException("ملف ZIP مفيهوش ترجمة SRT.");
+                using var reader = new StreamReader(entry.Open(), Encoding.UTF8, true);
+                subtitleText = await reader.ReadToEndAsync();
+            }
+            else subtitleText = Encoding.UTF8.GetString(subtitleBytes);
+
+            _subtitleLines = ParseSrt(subtitleText);
+            if (_subtitleLines.Count == 0) throw new InvalidOperationException("ملف الترجمة فارغ أو غير مفهوم.");
+            SubtitleOverlay.Visibility = Visibility.Visible;
+            _subtitleTimer.Start();
+            MessageBox.Show("تم تحميل الترجمة العربية. هتظهر متزامنة مع الفيديو.", "الترجمة العربية");
+        }
+        catch (Exception ex)
+        {
+            MessageBox.Show(ex.Message, "تعذّر البحث عن الترجمة العربية", MessageBoxButton.OK, MessageBoxImage.Information);
+        }
+        finally
+        {
+            SubtitleButton.IsEnabled = true;
+            SubtitleButton.Content = "ترجمة عربية";
+        }
+    }
+
+    private static string GetJsonString(JsonElement item, string property)
+    {
+        if (!item.TryGetProperty(property, out var value)) return "";
+        return value.ValueKind == JsonValueKind.String ? value.GetString() ?? "" : "";
+    }
+
+    private static string GuessSubtitleTitle(Uri uri)
+    {
+        string name = Uri.UnescapeDataString(uri.Segments.LastOrDefault() ?? "");
+        name = Path.GetFileNameWithoutExtension(name).Replace('_', ' ').Replace('.', ' ').Replace('-', ' ');
+        name = Regex.Replace(name, @"(?i)\\b(480p|720p|1080p|2160p|4k|web[- ]?dl|webrip|bluray|x264|x265|h264|h265|hevc|aac|dts)\\b", " ");
+        name = Regex.Replace(name, @"\\s+", " ").Trim();
+        return Regex.IsMatch(name, @"(?i)^(index|master|playlist|video|stream|manifest|segment|file|media)$") ? "" : name;
+    }
+
+    private static List<(TimeSpan Start, TimeSpan End, string Text)> ParseSrt(string srt)
+    {
+        var list = new List<(TimeSpan, TimeSpan, string)>();
+        var blocks = Regex.Split(srt.Replace("\\r", ""), @"\\n\\s*\\n");
+        foreach (var block in blocks)
+        {
+            var match = Regex.Match(block, @"(?<start>\\d{2}:\\d{2}:\\d{2}[,.]\\d{3})\\s*-->\\s*(?<end>\\d{2}:\\d{2}:\\d{2}[,.]\\d{3})");
+            if (!match.Success) continue;
+            if (!TimeSpan.TryParse(match.Groups["start"].Value.Replace(',', '.'), out var start)
+                || !TimeSpan.TryParse(match.Groups["end"].Value.Replace(',', '.'), out var end)) continue;
+            string text = Regex.Replace(block[(match.Index + match.Length)..], @"(?m)^\\s*\\d+\\s*$", "").Trim();
+            text = Regex.Replace(text, @"<[^>]+>", "");
+            if (!string.IsNullOrWhiteSpace(text)) list.Add((start, end, text));
+        }
+        return list.OrderBy(x => x.Item1).ToList();
+    }
+
+    private void UpdateSubtitleOverlay()
+    {
+        if (VideoPlayer.Source == null || VideoPlayer.Visibility != Visibility.Visible || VideoPlayer.NaturalDuration.HasTimeSpan == false)
+        { SubtitleOverlay.Text = ""; return; }
+        var position = VideoPlayer.Position;
+        var line = _subtitleLines.FirstOrDefault(x => position >= x.Start && position <= x.End);
+        SubtitleOverlay.Text = line.Text ?? "";
+        SubtitleOverlay.Visibility = string.IsNullOrWhiteSpace(SubtitleOverlay.Text) ? Visibility.Collapsed : Visibility.Visible;
+    }
+
     private static bool IsImageUrl(Uri uri)
     {
         var path = uri.AbsolutePath.ToLowerInvariant();
@@ -280,6 +403,9 @@ public partial class MainWindow : Window
     private void ShowHome()
     {
         RestoreHomeLayout();
+        _subtitleTimer.Stop();
+        _subtitleLines.Clear();
+        SubtitleOverlay.Text = ""; SubtitleOverlay.Visibility = Visibility.Collapsed;
         StopAudioDeck();
         VideoPlayer.Stop();
         VideoPlayer.Source = null;
