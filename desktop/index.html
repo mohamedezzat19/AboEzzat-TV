@@ -1,0 +1,111 @@
+<!doctype html>
+<html lang="ar" dir="rtl">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>أبو عزت TV</title>
+  <style>
+    :root { color-scheme: dark; font-family: system-ui, "Segoe UI", sans-serif; }
+    * { box-sizing: border-box; }
+    body { margin: 0; background: #10131b; color: #f5f7fb; min-height: 100vh; }
+    header { display:flex; align-items:center; justify-content:space-between; padding:18px 24px; background:#171c27; border-bottom:1px solid #2a3140; }
+    h1 { margin:0; font-size:24px; }
+    #status { color:#aab5c7; font-size:14px; }
+    main { padding:22px; display:grid; grid-template-columns:minmax(0,1fr) 280px; gap:20px; }
+    .player { background:#05070a; border:1px solid #2a3140; border-radius:14px; min-height:420px; display:flex; align-items:center; justify-content:center; overflow:hidden; }
+    video, img { max-width:100%; max-height:70vh; }
+    #placeholder { color:#7e8ba2; text-align:center; padding:20px; }
+    aside { background:#171c27; border:1px solid #2a3140; border-radius:14px; padding:18px; }
+    .ip { font-size:18px; direction:ltr; text-align:center; margin:12px 0; color:#76e0a0; }
+    button { width:100%; padding:12px; margin-top:10px; border:1px solid #394458; background:#222b3a; color:white; border-radius:8px; cursor:pointer; }
+    button:focus { outline:3px solid #ffd54a; }
+    #message { color:#aab5c7; line-height:1.7; overflow-wrap:anywhere; }
+    @media(max-width:850px) { main { grid-template-columns:1fr; } .player { min-height:280px; } }
+  </style>
+</head>
+<body>
+  <header>
+    <h1>أبو عزت TV</h1>
+    <div id="status">جاري تشغيل خدمة الاستقبال…</div>
+  </header>
+  <main>
+    <section>
+      <div class="player" id="player">
+        <div id="placeholder">افتح أبو عزت كاست واختر هذا الجهاز لإرسال الفيديو أو الصورة</div>
+      </div>
+      <button id="stop">إيقاف التشغيل</button>
+    </section>
+    <aside>
+      <h2>حالة الريسيفر</h2>
+      <div id="ip" class="ip">—</div>
+      <p id="message">في انتظار اتصال أبو عزت كاست.</p>
+      <p>منفذ الاستقبال: <b>8081</b></p>
+      <p>اكتشاف الأجهزة: UDP 37020</p>
+    </aside>
+  </main>
+  <script>
+    const player = document.getElementById("player");
+    const statusEl = document.getElementById("status");
+    const ipEl = document.getElementById("ip");
+    const messageEl = document.getElementById("message");
+    let currentMedia = null;
+
+    function showMedia(url) {
+      if (!url) return;
+      currentMedia = url;
+      player.innerHTML = "";
+      const clean = String(url).split("?")[0].toLowerCase();
+      if (/\.(jpg|jpeg|png|gif|webp|bmp)$/.test(clean)) {
+        const image = document.createElement("img");
+        image.src = url;
+        image.alt = "المحتوى المستلم";
+        player.appendChild(image);
+      } else {
+        const video = document.createElement("video");
+        video.src = url;
+        video.controls = true;
+        video.autoplay = true;
+        video.playsInline = true;
+        player.appendChild(video);
+        video.play().catch(() => {
+          messageEl.textContent = "وصل الرابط، لكن التشغيل التلقائي يحتاج تفاعلًا أو أن الصيغة غير مدعومة.";
+        });
+      }
+      messageEl.textContent = "تم استلام الرابط: " + url;
+    }
+
+    window.aboezzatReceiver.onEvent(event => {
+      if (event.type === "server-status") {
+        statusEl.textContent = "● خدمة الاستقبال تعمل";
+        ipEl.textContent = event.ip + ":" + event.port;
+      } else if (event.type === "server-error") {
+        statusEl.textContent = "تعذر فتح منفذ الاستقبال";
+        messageEl.textContent = event.message + " — قد يكون المنفذ 8081 مستخدمًا بالفعل.";
+      } else if (event.type === "play") {
+        showMedia(event.url);
+      } else if (event.type === "command") {
+        if (event.command === "stop") {
+          player.innerHTML = '<div id="placeholder">تم إيقاف التشغيل</div>';
+          currentMedia = null;
+        } else if (event.command === "play_pause") {
+          const video = player.querySelector("video");
+          if (video) video.paused ? video.play().catch(() => {}) : video.pause();
+        } else if (event.url) {
+          showMedia(event.url);
+        }
+        messageEl.textContent = "أمر من أبو عزت كاست: " + (event.command || "تشغيل");
+      } else if (event.type === "discovery-error") {
+        messageEl.textContent = "تعذر تشغيل اكتشاف الأجهزة: " + event.message;
+      }
+    });
+
+    document.getElementById("stop").addEventListener("click", () => {
+      const video = player.querySelector("video");
+      if (video) { video.pause(); video.removeAttribute("src"); video.load(); }
+      player.innerHTML = '<div id="placeholder">تم إيقاف التشغيل</div>';
+      currentMedia = null;
+      messageEl.textContent = "تم إيقاف التشغيل محليًا.";
+    });
+  </script>
+</body>
+</html>
