@@ -20,6 +20,8 @@ public partial class MainWindow : Window
     private UdpClient? _discoveryClient;
     private bool _isFullscreen;
     private readonly DispatcherTimer _subtitleTimer = new() { Interval = TimeSpan.FromMilliseconds(200) };
+    private readonly DispatcherTimer _controlsTimer = new() { Interval = TimeSpan.FromMilliseconds(500) };
+    private bool _isMuted;
     private readonly DispatcherTimer _resumeSaveTimer = new() { Interval = TimeSpan.FromSeconds(5) };
     private readonly Dictionary<string, double> _resumePositions = new(StringComparer.OrdinalIgnoreCase);
     private string? _currentVideoUrl;
@@ -46,6 +48,7 @@ public partial class MainWindow : Window
         IpText.Text = $"{GetLocalIPv4()}:{ReceiverPort}";
         Loaded += async (_, _) => await StartServerAsync();
         _subtitleTimer.Tick += (_, _) => UpdateSubtitleOverlay();
+        _controlsTimer.Tick += (_, _) => UpdatePlaybackControls();
         _resumeSaveTimer.Tick += (_, _) => SaveCurrentResumePosition();
         Closed += (_, _) => { SaveCurrentResumePosition(); SaveResumePositions(); StopServer(); };
     }
@@ -441,6 +444,66 @@ public partial class MainWindow : Window
         VideoPlayer.Play();
     }
 
+    private void PlayPause_Click(object sender, RoutedEventArgs e)
+    {
+        if (VideoPlayer.Source == null) return;
+        if (PlayPauseButton.Content?.ToString() == "تشغيل")
+        {
+            VideoPlayer.Play();
+            PlayPauseButton.Content = "إيقاف مؤقت";
+        }
+        else
+        {
+            VideoPlayer.Pause();
+            PlayPauseButton.Content = "تشغيل";
+        }
+    }
+
+    private void Back10_Click(object sender, RoutedEventArgs e)
+    {
+        if (VideoPlayer.Source != null)
+            VideoPlayer.Position = TimeSpan.FromSeconds(Math.Max(0, VideoPlayer.Position.TotalSeconds - 10));
+    }
+
+    private void Forward10_Click(object sender, RoutedEventArgs e)
+    {
+        if (VideoPlayer.Source != null && VideoPlayer.NaturalDuration.HasTimeSpan)
+            VideoPlayer.Position = TimeSpan.FromSeconds(Math.Min(VideoPlayer.NaturalDuration.TimeSpan.TotalSeconds, VideoPlayer.Position.TotalSeconds + 10));
+    }
+
+    private void SeekSlider_MouseLeftButtonUp(object sender, System.Windows.Input.MouseButtonEventArgs e)
+    {
+        if (VideoPlayer.Source != null && VideoPlayer.NaturalDuration.HasTimeSpan)
+            VideoPlayer.Position = TimeSpan.FromSeconds(VideoPlayer.NaturalDuration.TimeSpan.TotalSeconds * SeekSlider.Value / 100.0);
+    }
+
+    private void VolumeSlider_ValueChanged(object sender, RoutedPropertyChangedEventArgs<double> e)
+    {
+        if (VideoPlayer != null) VideoPlayer.Volume = e.NewValue;
+        if (AudioPlayer != null) AudioPlayer.Volume = e.NewValue;
+    }
+
+    private void Mute_Click(object sender, RoutedEventArgs e)
+    {
+        _isMuted = !_isMuted;
+        VideoPlayer.IsMuted = _isMuted;
+        AudioPlayer.IsMuted = _isMuted;
+        MuteButton.Content = _isMuted ? "إلغاء الكتم" : "كتم";
+    }
+
+    private void UpdatePlaybackControls()
+    {
+        if (VideoPlayer.Source == null || !VideoPlayer.NaturalDuration.HasTimeSpan) return;
+        var pos = VideoPlayer.Position;
+        var duration = VideoPlayer.NaturalDuration.TimeSpan;
+        PlaybackTimeText.Text = $"{FormatPlaybackTime(pos)} / {FormatPlaybackTime(duration)}";
+        if (!SeekSlider.IsMouseCaptureWithin)
+            SeekSlider.Value = duration.TotalSeconds > 0 ? pos.TotalSeconds / duration.TotalSeconds * 100 : 0;
+    }
+
+    private static string FormatPlaybackTime(TimeSpan time) =>
+        time.TotalHours >= 1 ? time.ToString(@"h\:mm\:ss") : time.ToString(@"m\:ss");
+
     private void VideoPlayer_MediaOpened(object sender, RoutedEventArgs e)
     {
         if (_resumePromptHandled || VideoPlayer.Source == null) return;
@@ -467,6 +530,9 @@ public partial class MainWindow : Window
 
         VideoPlayer.Play();
         _resumeSaveTimer.Start();
+        PlaybackControls.Visibility = Visibility.Visible;
+        PlayPauseButton.Content = "إيقاف مؤقت";
+        _controlsTimer.Start();
     }
 
     private enum ResumeChoice { Continue, Restart }
@@ -560,6 +626,8 @@ public partial class MainWindow : Window
     private void VideoPlayer_MediaEnded(object sender, RoutedEventArgs e)
     {
         _resumeSaveTimer.Stop();
+        _controlsTimer.Stop();
+        PlayPauseButton.Content = "تشغيل";
         if (!string.IsNullOrWhiteSpace(_currentVideoUrl)) _resumePositions.Remove(_currentVideoUrl);
         SaveResumePositions();
     }
@@ -611,6 +679,8 @@ public partial class MainWindow : Window
     {
         SaveCurrentResumePosition();
         _resumeSaveTimer.Stop();
+        _controlsTimer.Stop();
+        PlaybackControls.Visibility = Visibility.Collapsed;
         RestoreHomeLayout();
         _subtitleTimer.Stop();
         _subtitleLines.Clear();
