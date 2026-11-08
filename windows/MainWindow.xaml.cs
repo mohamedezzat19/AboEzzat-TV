@@ -26,9 +26,17 @@ public partial class MainWindow : Window
     private ResizeMode _savedResizeMode;
     private double _savedWidth, _savedHeight, _savedLeft, _savedTop;
 
+    private sealed record HistoryEntry(string Title, string Url, DateTime PlayedAt);
+    private readonly List<HistoryEntry> _history = new();
+    private string HistoryFile => Path.Combine(
+        Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData),
+        "AboEzzatTV", "playback-history.json");
+
     public MainWindow()
     {
         InitializeComponent();
+        LoadHistory();
+        RefreshHistoryList();
         IpText.Text = $"{GetLocalIPv4()}:{ReceiverPort}";
         Loaded += async (_, _) => await StartServerAsync();
         _subtitleTimer.Tick += (_, _) => UpdateSubtitleOverlay();
@@ -151,6 +159,7 @@ public partial class MainWindow : Window
 
     private void ReceiveMedia(string? videoUrl, string? audioUrl)
     {
+        if (!string.IsNullOrWhiteSpace(videoUrl) && IsHttpUrl(videoUrl) && !IsImageUrl(new Uri(videoUrl))) AddHistory(videoUrl);
         // Cast may send video and audio as two independent URLs.
         if (!string.IsNullOrWhiteSpace(videoUrl) && IsHttpUrl(videoUrl)
             && Uri.TryCreate(videoUrl, UriKind.Absolute, out var videoUri))
@@ -174,6 +183,55 @@ public partial class MainWindow : Window
         {
             PlayAudioOnly(audioOnlyUri);
         }
+    }
+
+    private void AddHistory(string url)
+    {
+        string title = GuessSubtitleTitle(new Uri(url));
+        if (string.IsNullOrWhiteSpace(title)) title = url;
+        _history.RemoveAll(x => string.Equals(x.Url, url, StringComparison.OrdinalIgnoreCase));
+        _history.Insert(0, new HistoryEntry(title, url, DateTime.Now));
+        if (_history.Count > 50) _history.RemoveRange(50, _history.Count - 50);
+        SaveHistory();
+        RefreshHistoryList();
+    }
+
+    private void LoadHistory()
+    {
+        try
+        {
+            if (!File.Exists(HistoryFile)) return;
+            var loaded = JsonSerializer.Deserialize<List<HistoryEntry>>(File.ReadAllText(HistoryFile));
+            if (loaded != null) _history.AddRange(loaded.Take(50));
+        }
+        catch { _history.Clear(); }
+    }
+
+    private void SaveHistory()
+    {
+        try
+        {
+            Directory.CreateDirectory(Path.GetDirectoryName(HistoryFile)!);
+            File.WriteAllText(HistoryFile, JsonSerializer.Serialize(_history));
+        }
+        catch (Exception ex) { System.Diagnostics.Debug.WriteLine($"Save history failed: {ex.Message}"); }
+    }
+
+    private void RefreshHistoryList()
+    {
+        if (HistoryList == null) return;
+        HistoryList.ItemsSource = null;
+        HistoryList.ItemsSource = _history.Select(x => $"{x.Title}  •  {x.PlayedAt:MM/dd HH:mm}").ToList();
+    }
+
+    private void HistoryList_SelectionChanged(object sender, System.Windows.Controls.SelectionChangedEventArgs e)
+    {
+        int index = HistoryList.SelectedIndex;
+        if (index < 0 || index >= _history.Count) return;
+        string url = _history[index].Url;
+        HistoryList.SelectedIndex = -1;
+        if (Uri.TryCreate(url, UriKind.Absolute, out var uri) && IsHttpUrl(url))
+            ReceiveMedia(url, null);
     }
 
     private void PlaySeparateAudio(Uri uri)
