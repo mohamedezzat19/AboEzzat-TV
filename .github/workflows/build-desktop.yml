@@ -14,13 +14,13 @@ jobs:
       matrix:
         include:
           - os: windows-latest
-            target: nsis
+            builder_args: "--win nsis"
             artifact: windows
           - os: macos-latest
-            target: dmg
+            builder_args: "--mac dmg"
             artifact: macos
           - os: ubuntu-latest
-            target: AppImage
+            builder_args: "--linux AppImage"
             artifact: linux
     runs-on: ${{ matrix.os }}
     defaults:
@@ -36,7 +36,7 @@ jobs:
       - name: Install dependencies
         run: npm install
       - name: Build desktop app
-        run: npx electron-builder --${{ matrix.target }}
+        run: npx electron-builder ${{ matrix.builder_args }}
       - name: Upload build artifact
         uses: actions/upload-artifact@v4
         with:
