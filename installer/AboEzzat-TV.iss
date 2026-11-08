@@ -4,7 +4,7 @@
 #define MyAppExeName "AboEzzatReceiver.Windows.exe"
 
 [Setup]
-AppId={{B7D94B2D-8E43-4E58-9C0B-AB0EZZATTV01}
+AppId={{B7D94B2D-8E43-4E58-9C0B-AB0E22A77101}
 AppName={#MyAppName}
 AppVersion={#MyAppVersion}
 AppPublisher={#MyAppPublisher}
