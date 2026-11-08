@@ -23,7 +23,7 @@ jobs:
           dotnet-version: "8.0.x"
 
       - name: Restore
-        run: dotnet restore windows/AboEzzatReceiver.Windows.csproj
+        run: dotnet restore windows/AboEzzatReceiver.Windows.csproj --runtime win-x64
 
       - name: Publish self-contained Windows x64 app
         run: dotnet publish windows/AboEzzatReceiver.Windows.csproj --configuration Release --runtime win-x64 --self-contained true --no-restore -p:PublishSingleFile=false -o windows/publish/win-x64
