@@ -20,6 +20,11 @@ public partial class MainWindow : Window
     private UdpClient? _discoveryClient;
     private bool _isFullscreen;
     private readonly DispatcherTimer _subtitleTimer = new() { Interval = TimeSpan.FromMilliseconds(200) };
+    private readonly DispatcherTimer _resumeSaveTimer = new() { Interval = TimeSpan.FromSeconds(5) };
+    private readonly Dictionary<string, double> _resumePositions = new(StringComparer.OrdinalIgnoreCase);
+    private string? _currentVideoUrl;
+    private bool _resumePromptHandled;
+    private string ResumeFile => Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData), "AboEzzatTV", "resume-positions.json");
     private List<(TimeSpan Start, TimeSpan End, string Text)> _subtitleLines = new();
     private bool _isMediaExpanded;
     private WindowStyle _savedStyle;
@@ -36,11 +41,13 @@ public partial class MainWindow : Window
     {
         InitializeComponent();
         LoadHistory();
+        LoadResumePositions();
         RefreshHistoryList();
         IpText.Text = $"{GetLocalIPv4()}:{ReceiverPort}";
         Loaded += async (_, _) => await StartServerAsync();
         _subtitleTimer.Tick += (_, _) => UpdateSubtitleOverlay();
-        Closed += (_, _) => StopServer();
+        _resumeSaveTimer.Tick += (_, _) => SaveCurrentResumePosition();
+        Closed += (_, _) => { SaveCurrentResumePosition(); SaveResumePositions(); StopServer(); };
     }
 
     private static string GetLocalIPv4()
@@ -418,6 +425,10 @@ public partial class MainWindow : Window
 
     private async void PlayVideo(Uri uri)
     {
+        SaveCurrentResumePosition();
+        _resumeSaveTimer.Stop();
+        _currentVideoUrl = uri.AbsoluteUri;
+        _resumePromptHandled = false;
         ExpandMediaForPlayback();
         ReceivedImage.Visibility = Visibility.Collapsed;
         VideoPlayer.Stop();
@@ -428,6 +439,129 @@ public partial class MainWindow : Window
         VideoPlayer.Source = uri;
         VideoPlayer.Position = TimeSpan.Zero;
         VideoPlayer.Play();
+    }
+
+    private void VideoPlayer_MediaOpened(object sender, RoutedEventArgs e)
+    {
+        if (_resumePromptHandled || VideoPlayer.Source == null) return;
+        _resumePromptHandled = true;
+        VideoPlayer.Pause();
+
+        if (!string.IsNullOrWhiteSpace(_currentVideoUrl)
+            && _resumePositions.TryGetValue(_currentVideoUrl, out double savedSeconds)
+            && savedSeconds >= 10
+            && VideoPlayer.NaturalDuration.HasTimeSpan
+            && savedSeconds < VideoPlayer.NaturalDuration.TimeSpan.TotalSeconds - 15)
+        {
+            var saved = TimeSpan.FromSeconds(savedSeconds);
+            if (AskResumeChoice(saved) == ResumeChoice.Continue)
+                VideoPlayer.Position = saved;
+            else
+            {
+                VideoPlayer.Position = TimeSpan.Zero;
+                _resumePositions.Remove(_currentVideoUrl);
+                SaveResumePositions();
+            }
+        }
+        else VideoPlayer.Position = TimeSpan.Zero;
+
+        VideoPlayer.Play();
+        _resumeSaveTimer.Start();
+    }
+
+    private enum ResumeChoice { Continue, Restart }
+
+    private ResumeChoice AskResumeChoice(TimeSpan savedPosition)
+    {
+        string FormatTime(TimeSpan t) => t.TotalHours >= 1 ? t.ToString(@"h\:mm\:ss") : t.ToString(@"m\:ss");
+        var dialog = new Window
+        {
+            Title = "استكمال المشاهدة؟", Width = 460, Height = 220,
+            WindowStartupLocation = WindowStartupLocation.CenterOwner, Owner = this,
+            ResizeMode = ResizeMode.NoResize, WindowStyle = WindowStyle.ToolWindow,
+            Background = new SolidColorBrush(Color.FromRgb(18, 29, 59)),
+            Foreground = Brushes.White, ShowInTaskbar = false
+        };
+        var heading = new TextBlock
+        {
+            Text = "استكمال المشاهدة؟", FontSize = 23, FontWeight = FontWeights.Bold,
+            HorizontalAlignment = HorizontalAlignment.Center, Margin = new Thickness(10, 12, 10, 6)
+        };
+        var detail = new TextBlock
+        {
+            Text = $"هل تريد استكمال الفيديو من آخر نقطة؟ ({FormatTime(savedPosition)})",
+            FontSize = 15, TextWrapping = TextWrapping.Wrap, TextAlignment = TextAlignment.Center,
+            HorizontalAlignment = HorizontalAlignment.Center, Margin = new Thickness(16, 4, 16, 14)
+        };
+        var continueButton = new Button
+        {
+            Content = "استكمال المشاهدة", MinWidth = 160, Padding = new Thickness(12, 9, 12, 9),
+            Margin = new Thickness(8), IsDefault = true,
+            Background = new SolidColorBrush(Color.FromRgb(35, 143, 112)),
+            Foreground = Brushes.White, BorderThickness = new Thickness(0)
+        };
+        var restartButton = new Button
+        {
+            Content = "البدء من البداية", MinWidth = 145, Padding = new Thickness(12, 9, 12, 9),
+            Margin = new Thickness(8), IsCancel = true,
+            Background = new SolidColorBrush(Color.FromRgb(47, 62, 101)),
+            Foreground = Brushes.White, BorderThickness = new Thickness(0)
+        };
+        ResumeChoice result = ResumeChoice.Restart;
+        continueButton.Click += (_, _) => { result = ResumeChoice.Continue; dialog.DialogResult = true; };
+        restartButton.Click += (_, _) => { result = ResumeChoice.Restart; dialog.DialogResult = false; };
+        var buttons = new StackPanel { Orientation = Orientation.Horizontal, HorizontalAlignment = HorizontalAlignment.Center };
+        buttons.Children.Add(continueButton); buttons.Children.Add(restartButton);
+        var panel = new DockPanel();
+        DockPanel.SetDock(buttons, Dock.Bottom); panel.Children.Add(buttons);
+        DockPanel.SetDock(heading, Dock.Top); panel.Children.Add(heading); panel.Children.Add(detail);
+        dialog.Content = panel;
+        dialog.ShowDialog();
+        return result;
+    }
+
+    private void LoadResumePositions()
+    {
+        try
+        {
+            if (!File.Exists(ResumeFile)) return;
+            var saved = JsonSerializer.Deserialize<Dictionary<string, double>>(File.ReadAllText(ResumeFile));
+            if (saved != null)
+                foreach (var item in saved.Where(x => IsHttpUrl(x.Key) && x.Value > 0))
+                    _resumePositions[item.Key] = item.Value;
+        }
+        catch { _resumePositions.Clear(); }
+    }
+
+    private void SaveResumePositions()
+    {
+        try
+        {
+            Directory.CreateDirectory(Path.GetDirectoryName(ResumeFile)!);
+            File.WriteAllText(ResumeFile, JsonSerializer.Serialize(_resumePositions));
+        }
+        catch (Exception ex) { System.Diagnostics.Debug.WriteLine($"Save resume positions failed: {ex.Message}"); }
+    }
+
+    private void SaveCurrentResumePosition()
+    {
+        if (string.IsNullOrWhiteSpace(_currentVideoUrl) || VideoPlayer.Source == null
+            || VideoPlayer.Visibility != Visibility.Visible || !VideoPlayer.NaturalDuration.HasTimeSpan)
+            return;
+        double current = VideoPlayer.Position.TotalSeconds;
+        double duration = VideoPlayer.NaturalDuration.TimeSpan.TotalSeconds;
+        if (current >= 10 && duration > 0 && current < duration - 15)
+            _resumePositions[_currentVideoUrl] = current;
+        else if (duration > 0 && current >= duration - 15)
+            _resumePositions.Remove(_currentVideoUrl);
+        SaveResumePositions();
+    }
+
+    private void VideoPlayer_MediaEnded(object sender, RoutedEventArgs e)
+    {
+        _resumeSaveTimer.Stop();
+        if (!string.IsNullOrWhiteSpace(_currentVideoUrl)) _resumePositions.Remove(_currentVideoUrl);
+        SaveResumePositions();
     }
 
     private void ExpandMediaForPlayback()
@@ -475,6 +609,8 @@ public partial class MainWindow : Window
 
     private void ShowHome()
     {
+        SaveCurrentResumePosition();
+        _resumeSaveTimer.Stop();
         RestoreHomeLayout();
         _subtitleTimer.Stop();
         _subtitleLines.Clear();
@@ -489,7 +625,6 @@ public partial class MainWindow : Window
     }
 
     private void Stop_Click(object sender, RoutedEventArgs e) => ShowHome();
-    private void VideoPlayer_MediaEnded(object sender, RoutedEventArgs e) { }
 
     private void Fullscreen_Click(object sender, RoutedEventArgs e)
     {
