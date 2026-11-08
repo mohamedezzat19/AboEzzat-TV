@@ -3,6 +3,8 @@
  xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
  xmlns:vlc="clr-namespace:LibVLCSharp.WPF;assembly=LibVLCSharp.WPF">
  <Grid Background="#0D1634">
-  <vlc:VideoView x:Name="VlcView" />
+  <vlc:VideoView x:Name="VlcView">
+  <Grid x:Name="OverlayHost" Background="#02000000"/>
+ </vlc:VideoView>
  </Grid>
 </UserControl>
