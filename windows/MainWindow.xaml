@@ -31,7 +31,7 @@
    </Border>
    <Border x:Name="MediaPanel" Grid.Column="2" Background="#0D1634" CornerRadius="18" Padding="8" MouseMove="MediaPanel_MouseMove">
     <Grid>
-     <local:VlcPlaybackPrototype x:Name="VideoPlayer" Stretch="Uniform"
+     <local:VlcPlaybackPrototype x:Name="VideoPlayer"
                    MediaOpened="VideoPlayer_MediaOpened" MediaEnded="VideoPlayer_MediaEnded" Visibility="Collapsed"/>
      <!-- Hidden second deck for separately supplied Cast audio. -->
      <MediaElement x:Name="AudioPlayer" Width="1" Height="1" Opacity="0" IsHitTestVisible="False"
