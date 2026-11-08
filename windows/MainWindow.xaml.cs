@@ -213,9 +213,8 @@ public partial class MainWindow : Window
         string title = GuessSubtitleTitle(VideoPlayer.Source);
         if (string.IsNullOrWhiteSpace(title))
         {
-            var dialog = new SubtitleTitleDialog();
-            if (dialog.ShowDialog() != true || string.IsNullOrWhiteSpace(dialog.TitleText)) return;
-            title = dialog.TitleText.Trim();
+            title = AskSubtitleTitle();
+            if (string.IsNullOrWhiteSpace(title)) return;
         }
 
         SubtitleButton.IsEnabled = false;
@@ -278,6 +277,20 @@ public partial class MainWindow : Window
         }
     }
 
+    private string AskSubtitleTitle()
+    {
+        var dialog = new Window { Title = "اسم الفيلم أو المسلسل", Width = 420, Height = 155, WindowStartupLocation = WindowStartupLocation.CenterOwner, Owner = this, ResizeMode = ResizeMode.NoResize };
+        var input = new TextBox { Margin = new Thickness(12), FontSize = 16 };
+        var search = new Button { Content = "بحث", Width = 90, Margin = new Thickness(8), IsDefault = true };
+        var cancel = new Button { Content = "إلغاء", Width = 90, Margin = new Thickness(8), IsCancel = true };
+        string result = "";
+        search.Click += (_, _) => { result = input.Text.Trim(); dialog.DialogResult = true; };
+        var buttons = new StackPanel { Orientation = Orientation.Horizontal, HorizontalAlignment = HorizontalAlignment.Center };
+        buttons.Children.Add(search); buttons.Children.Add(cancel);
+        var panel = new DockPanel(); DockPanel.SetDock(buttons, Dock.Bottom); panel.Children.Add(buttons); panel.Children.Add(input);
+        dialog.Content = panel; dialog.ShowDialog(); return result;
+    }
+
     private static string GetJsonString(JsonElement item, string property)
     {
         if (!item.TryGetProperty(property, out var value)) return "";
@@ -288,22 +301,22 @@ public partial class MainWindow : Window
     {
         string name = Uri.UnescapeDataString(uri.Segments.LastOrDefault() ?? "");
         name = Path.GetFileNameWithoutExtension(name).Replace('_', ' ').Replace('.', ' ').Replace('-', ' ');
-        name = Regex.Replace(name, @"(?i)\\b(480p|720p|1080p|2160p|4k|web[- ]?dl|webrip|bluray|x264|x265|h264|h265|hevc|aac|dts)\\b", " ");
-        name = Regex.Replace(name, @"\\s+", " ").Trim();
+        name = Regex.Replace(name, @"(?i)\b(480p|720p|1080p|2160p|4k|web[- ]?dl|webrip|bluray|x264|x265|h264|h265|hevc|aac|dts)\b", " ");
+        name = Regex.Replace(name, @"\s+", " ").Trim();
         return Regex.IsMatch(name, @"(?i)^(index|master|playlist|video|stream|manifest|segment|file|media)$") ? "" : name;
     }
 
     private static List<(TimeSpan Start, TimeSpan End, string Text)> ParseSrt(string srt)
     {
         var list = new List<(TimeSpan, TimeSpan, string)>();
-        var blocks = Regex.Split(srt.Replace("\\r", ""), @"\\n\\s*\\n");
+        var blocks = Regex.Split(srt.Replace("\\r", ""), @"\n\s*\n");
         foreach (var block in blocks)
         {
-            var match = Regex.Match(block, @"(?<start>\\d{2}:\\d{2}:\\d{2}[,.]\\d{3})\\s*-->\\s*(?<end>\\d{2}:\\d{2}:\\d{2}[,.]\\d{3})");
+            var match = Regex.Match(block, @"(?<start>\d{2}:\d{2}:\d{2}[,.]\d{3})\s*-->\s*(?<end>\d{2}:\d{2}:\d{2}[,.]\d{3})");
             if (!match.Success) continue;
             if (!TimeSpan.TryParse(match.Groups["start"].Value.Replace(',', '.'), out var start)
                 || !TimeSpan.TryParse(match.Groups["end"].Value.Replace(',', '.'), out var end)) continue;
-            string text = Regex.Replace(block[(match.Index + match.Length)..], @"(?m)^\\s*\\d+\\s*$", "").Trim();
+            string text = Regex.Replace(block[(match.Index + match.Length)..], @"(?m)^\s*\d+\s*$", "").Trim();
             text = Regex.Replace(text, @"<[^>]+>", "");
             if (!string.IsNullOrWhiteSpace(text)) list.Add((start, end, text));
         }
