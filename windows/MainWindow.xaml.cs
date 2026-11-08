@@ -448,20 +448,41 @@ public partial class MainWindow : Window
 
     private void Window_PreviewKeyDown(object sender, System.Windows.Input.KeyEventArgs e)
     {
-        if (VideoPlayer.Source == null || VideoPlayer.Visibility != Visibility.Visible) return;
+        bool videoActive = VideoPlayer.Source != null && VideoPlayer.Visibility == Visibility.Visible;
+        bool imageActive = ReceivedImage.Source != null && ReceivedImage.Visibility == Visibility.Visible;
+        bool mediaActive = videoActive || imageActive;
+
+        // Fullscreen and back navigation must work for images as well as videos.
         switch (e.Key)
         {
-            case System.Windows.Input.Key.Space: PlayPause_Click(this, new RoutedEventArgs()); e.Handled = true; break;
-            case System.Windows.Input.Key.Left: Back10_Click(this, new RoutedEventArgs()); e.Handled = true; break;
-            case System.Windows.Input.Key.Right: Forward10_Click(this, new RoutedEventArgs()); e.Handled = true; break;
-            case System.Windows.Input.Key.Up: VolumeSlider.Value = Math.Min(1, VolumeSlider.Value + 0.05); e.Handled = true; break;
-            case System.Windows.Input.Key.Down: VolumeSlider.Value = Math.Max(0, VolumeSlider.Value - 0.05); e.Handled = true; break;
-            case System.Windows.Input.Key.M: Mute_Click(this, new RoutedEventArgs()); e.Handled = true; break;
-            case System.Windows.Input.Key.F: Fullscreen_Click(this, new RoutedEventArgs()); e.Handled = true; break;
-            case System.Windows.Input.Key.Escape: if (_isFullscreen) Fullscreen_Click(this, new RoutedEventArgs()); else ShowHome(); e.Handled = true; break;
-            case System.Windows.Input.Key.Back: ShowHome(); e.Handled = true; break;
+            case System.Windows.Input.Key.F:
+                if (mediaActive) { Fullscreen_Click(this, new RoutedEventArgs()); e.Handled = true; }
+                break;
+            case System.Windows.Input.Key.Escape:
+                if (_isFullscreen) Fullscreen_Click(this, new RoutedEventArgs());
+                else if (mediaActive) ShowHome();
+                e.Handled = mediaActive || _isFullscreen;
+                break;
+            case System.Windows.Input.Key.Back:
+                if (mediaActive) { ShowHome(); e.Handled = true; }
+                break;
         }
-        if (e.Handled) ShowPlaybackControls();
+
+        // Playback shortcuts are video-only.
+        if (videoActive && !e.Handled)
+        {
+            switch (e.Key)
+            {
+                case System.Windows.Input.Key.Space: PlayPause_Click(this, new RoutedEventArgs()); e.Handled = true; break;
+                case System.Windows.Input.Key.Left: Back10_Click(this, new RoutedEventArgs()); e.Handled = true; break;
+                case System.Windows.Input.Key.Right: Forward10_Click(this, new RoutedEventArgs()); e.Handled = true; break;
+                case System.Windows.Input.Key.Up: VolumeSlider.Value = Math.Min(1, VolumeSlider.Value + 0.05); e.Handled = true; break;
+                case System.Windows.Input.Key.Down: VolumeSlider.Value = Math.Max(0, VolumeSlider.Value - 0.05); e.Handled = true; break;
+                case System.Windows.Input.Key.M: Mute_Click(this, new RoutedEventArgs()); e.Handled = true; break;
+            }
+        }
+
+        if (e.Handled && videoActive) ShowPlaybackControls();
     }
 
     private void MediaPanel_MouseMove(object sender, System.Windows.Input.MouseEventArgs e)
