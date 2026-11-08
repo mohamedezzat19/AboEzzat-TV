@@ -109,6 +109,7 @@ public partial class MainWindow : Window
     {
         string? mediaUrl = null, audioUrl = null, command = null;
         List<string> imageUrls = new();
+        var mediaHeaders = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
         try
         {
             var request = ctx.Request;
@@ -121,6 +122,16 @@ public partial class MainWindow : Window
                 var root = json.RootElement;
                 if (root.TryGetProperty("url", out var u)) mediaUrl = u.GetString();
                 if (root.TryGetProperty("audio", out var a)) audioUrl = a.GetString();
+                if (root.TryGetProperty("headers", out var h) && h.ValueKind == JsonValueKind.Object)
+                {
+                    foreach (var header in h.EnumerateObject())
+                    {
+                        if (header.Value.ValueKind != JsonValueKind.String) continue;
+                        var headerValue = header.Value.GetString();
+                        if (!string.IsNullOrWhiteSpace(headerValue) && !headerValue.Contains("\\r") && !headerValue.Contains("\\n"))
+                            mediaHeaders[header.Name] = headerValue;
+                    }
+                }
                 if (root.TryGetProperty("images", out var images) && images.ValueKind == JsonValueKind.Array)
                     imageUrls.AddRange(images.EnumerateArray()
                         .Where(x => x.ValueKind == JsonValueKind.String)
@@ -167,7 +178,7 @@ public partial class MainWindow : Window
                 Dispatcher.Invoke(() =>
                 {
                     if (images.Length > 0) StartImagePlaylist(images);
-                    else ReceiveMedia(video, audio);
+                    else ReceiveMedia(video, audio, mediaHeaders);
                 });
             }
         }
@@ -190,7 +201,7 @@ public partial class MainWindow : Window
         Uri.TryCreate(value, UriKind.Absolute, out var uri)
         && (uri.Scheme == Uri.UriSchemeHttp || uri.Scheme == Uri.UriSchemeHttps);
 
-    private void ReceiveMedia(string? videoUrl, string? audioUrl)
+    private void ReceiveMedia(string? videoUrl, string? audioUrl, IReadOnlyDictionary<string, string>? headers = null)
     {
         if (!string.IsNullOrWhiteSpace(videoUrl) && IsHttpUrl(videoUrl) && !IsImageUrl(new Uri(videoUrl))) AddHistory(videoUrl);
         // Cast may send video and audio as two independent URLs.
@@ -209,7 +220,7 @@ public partial class MainWindow : Window
             }
             else
             {
-                PlayVideo(videoUri);
+                PlayVideo(videoUri, headers);
                 if (!string.IsNullOrWhiteSpace(audioUrl) && IsHttpUrl(audioUrl)
                     && Uri.TryCreate(audioUrl, UriKind.Absolute, out var audioUri))
                     PlaySeparateAudio(audioUri);
@@ -454,7 +465,7 @@ public partial class MainWindow : Window
         }
     }
 
-    private async void PlayVideo(Uri uri)
+    private async void PlayVideo(Uri uri, IReadOnlyDictionary<string, string>? headers = null)
     {
         SaveCurrentResumePosition();
         _resumeSaveTimer.Stop();
@@ -464,6 +475,7 @@ public partial class MainWindow : Window
         ReceivedImage.Visibility = Visibility.Collapsed;
         VideoPlayer.Stop();
         VideoPlayer.Source = null;
+        VideoPlayer.RequestHeaders = headers;
         WelcomePanel.Visibility = Visibility.Collapsed;
         VideoPlayer.Visibility = Visibility.Visible;
         await Task.Delay(150);
