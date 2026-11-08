@@ -1,0 +1,47 @@
+name: Build AboEzzat TV Desktop
+
+on:
+  workflow_dispatch:
+  push:
+    paths:
+      - "desktop/**"
+      - ".github/workflows/build-desktop.yml"
+
+jobs:
+  build:
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - os: windows-latest
+            target: nsis
+            artifact: windows
+          - os: macos-latest
+            target: dmg
+            artifact: macos
+          - os: ubuntu-latest
+            target: AppImage
+            artifact: linux
+    runs-on: ${{ matrix.os }}
+    defaults:
+      run:
+        working-directory: desktop
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+          cache-dependency-path: desktop/package.json
+      - name: Install dependencies
+        run: npm install
+      - name: Build desktop app
+        run: npx electron-builder --${{ matrix.target }}
+      - name: Upload build artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: aboezzat-tv-${{ matrix.artifact }}
+          path: desktop/dist/**
+          if-no-files-found: error
