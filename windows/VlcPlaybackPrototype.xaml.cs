@@ -167,6 +167,8 @@ public partial class VlcPlaybackPrototype : UserControl, IDisposable
     public void Dispose()
     {
         Stop();
+        VlcView.MediaPlayer = null;
+        VlcView.Dispose();
         _mediaPlayer.Dispose();
         _libVlc.Dispose();
     }
