@@ -85,12 +85,28 @@ public sealed class VlcAudioPlayback : IDisposable
         }
     }
 
-    public void Play()
+    public void Play() => Play(TimeSpan.Zero);
+
+    public void Play(TimeSpan startAt)
     {
         ThrowIfDisposed();
         if (_media is null) return;
+
         _player.Volume = (int)Math.Round(_volume * 100);
         _player.Mute = _isMuted;
+
+        long targetMilliseconds = (long)Math.Max(0, startAt.TotalMilliseconds);
+        if (targetMilliseconds > 0)
+        {
+            EventHandler? onPlaying = null;
+            onPlaying = (_, _) =>
+            {
+                if (onPlaying is not null) _player.Playing -= onPlaying;
+                _player.Time = targetMilliseconds;
+            };
+            _player.Playing += onPlaying;
+        }
+
         _player.Play(_media);
     }
 
