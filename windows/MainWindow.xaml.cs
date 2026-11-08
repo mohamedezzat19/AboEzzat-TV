@@ -21,6 +21,7 @@ public partial class MainWindow : Window
     private bool _isFullscreen;
     private readonly DispatcherTimer _subtitleTimer = new() { Interval = TimeSpan.FromMilliseconds(200) };
     private readonly DispatcherTimer _controlsTimer = new() { Interval = TimeSpan.FromMilliseconds(500) };
+    private readonly DispatcherTimer _controlsHideTimer = new() { Interval = TimeSpan.FromSeconds(4) };
     private bool _isMuted;
     private readonly DispatcherTimer _resumeSaveTimer = new() { Interval = TimeSpan.FromSeconds(5) };
     private readonly Dictionary<string, double> _resumePositions = new(StringComparer.OrdinalIgnoreCase);
@@ -49,6 +50,7 @@ public partial class MainWindow : Window
         Loaded += async (_, _) => await StartServerAsync();
         _subtitleTimer.Tick += (_, _) => UpdateSubtitleOverlay();
         _controlsTimer.Tick += (_, _) => UpdatePlaybackControls();
+        _controlsHideTimer.Tick += (_, _) => HidePlaybackControlsIfNeeded();
         _resumeSaveTimer.Tick += (_, _) => SaveCurrentResumePosition();
         Closed += (_, _) => { SaveCurrentResumePosition(); SaveResumePositions(); StopServer(); };
     }
@@ -444,6 +446,44 @@ public partial class MainWindow : Window
         VideoPlayer.Play();
     }
 
+    private void Window_PreviewKeyDown(object sender, System.Windows.Input.KeyEventArgs e)
+    {
+        if (VideoPlayer.Source == null || VideoPlayer.Visibility != Visibility.Visible) return;
+        switch (e.Key)
+        {
+            case System.Windows.Input.Key.Space: PlayPause_Click(this, new RoutedEventArgs()); e.Handled = true; break;
+            case System.Windows.Input.Key.Left: Back10_Click(this, new RoutedEventArgs()); e.Handled = true; break;
+            case System.Windows.Input.Key.Right: Forward10_Click(this, new RoutedEventArgs()); e.Handled = true; break;
+            case System.Windows.Input.Key.Up: VolumeSlider.Value = Math.Min(1, VolumeSlider.Value + 0.05); e.Handled = true; break;
+            case System.Windows.Input.Key.Down: VolumeSlider.Value = Math.Max(0, VolumeSlider.Value - 0.05); e.Handled = true; break;
+            case System.Windows.Input.Key.M: Mute_Click(this, new RoutedEventArgs()); e.Handled = true; break;
+            case System.Windows.Input.Key.F: Fullscreen_Click(this, new RoutedEventArgs()); e.Handled = true; break;
+            case System.Windows.Input.Key.Escape: if (_isFullscreen) Fullscreen_Click(this, new RoutedEventArgs()); else ShowHome(); e.Handled = true; break;
+            case System.Windows.Input.Key.Back: ShowHome(); e.Handled = true; break;
+        }
+        if (e.Handled) ShowPlaybackControls();
+    }
+
+    private void MediaPanel_MouseMove(object sender, System.Windows.Input.MouseEventArgs e)
+    {
+        if (VideoPlayer.Source != null && VideoPlayer.Visibility == Visibility.Visible) ShowPlaybackControls();
+    }
+
+    private void ShowPlaybackControls()
+    {
+        PlaybackControls.Visibility = Visibility.Visible;
+        _controlsHideTimer.Stop();
+        if (PlayPauseButton.Content?.ToString() != "تشغيل") _controlsHideTimer.Start();
+    }
+
+    private void HidePlaybackControlsIfNeeded()
+    {
+        _controlsHideTimer.Stop();
+        if (VideoPlayer.Source != null && VideoPlayer.Visibility == Visibility.Visible
+            && PlayPauseButton.Content?.ToString() != "تشغيل" && !PlaybackControls.IsMouseOver)
+            PlaybackControls.Visibility = Visibility.Collapsed;
+    }
+
     private void PlayPause_Click(object sender, RoutedEventArgs e)
     {
         if (VideoPlayer.Source == null) return;
@@ -451,11 +491,14 @@ public partial class MainWindow : Window
         {
             VideoPlayer.Play();
             PlayPauseButton.Content = "إيقاف مؤقت";
+            ShowPlaybackControls();
         }
         else
         {
             VideoPlayer.Pause();
             PlayPauseButton.Content = "تشغيل";
+            _controlsHideTimer.Stop();
+            PlaybackControls.Visibility = Visibility.Visible;
         }
     }
 
@@ -533,6 +576,7 @@ public partial class MainWindow : Window
         PlaybackControls.Visibility = Visibility.Visible;
         PlayPauseButton.Content = "إيقاف مؤقت";
         _controlsTimer.Start();
+        ShowPlaybackControls();
     }
 
     private enum ResumeChoice { Continue, Restart }
@@ -627,6 +671,8 @@ public partial class MainWindow : Window
     {
         _resumeSaveTimer.Stop();
         _controlsTimer.Stop();
+        _controlsHideTimer.Stop();
+        PlaybackControls.Visibility = Visibility.Collapsed;
         PlayPauseButton.Content = "تشغيل";
         if (!string.IsNullOrWhiteSpace(_currentVideoUrl)) _resumePositions.Remove(_currentVideoUrl);
         SaveResumePositions();
@@ -680,6 +726,7 @@ public partial class MainWindow : Window
         SaveCurrentResumePosition();
         _resumeSaveTimer.Stop();
         _controlsTimer.Stop();
+        _controlsHideTimer.Stop();
         PlaybackControls.Visibility = Visibility.Collapsed;
         RestoreHomeLayout();
         _subtitleTimer.Stop();
