@@ -35,6 +35,8 @@ public partial class MainWindow : Window
     private readonly DispatcherTimer _resumeSaveTimer = new() { Interval = TimeSpan.FromSeconds(5) };
     private readonly Dictionary<string, double> _resumePositions = new(StringComparer.OrdinalIgnoreCase);
     private string? _currentVideoUrl;
+    private Uri? _pendingSeparateAudio;
+    private IReadOnlyDictionary<string, string>? _pendingAudioHeaders;
     private bool _resumePromptHandled;
     private string ResumeFile => Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData), "AboEzzatTV", "resume-positions.json");
     private List<(TimeSpan Start, TimeSpan End, string Text)> _subtitleLines = new();
@@ -292,18 +294,19 @@ public partial class MainWindow : Window
             ReceiveMedia(url, null);
     }
 
-    private void PlaySeparateAudio(Uri uri, IReadOnlyDictionary<string, string>? headers = null)
+    private void PlaySeparateAudio(Uri uri, IReadOnlyDictionary<string, string>? headers = null, TimeSpan startAt = default)
     {
         AudioPlayer.Stop();
         AudioPlayer.Source = null;
         AudioPlayer.RequestHeaders = headers;
         AudioPlayer.Source = uri;
-        AudioPlayer.Position = TimeSpan.Zero;
-        AudioPlayer.Play();
+        AudioPlayer.Play(startAt);
     }
 
     private void PlayAudioOnly(Uri uri, IReadOnlyDictionary<string, string>? headers = null)
     {
+        _pendingSeparateAudio = null;
+        _pendingAudioHeaders = null;
         ExpandMediaForPlayback();
         VideoPlayer.Stop();
         VideoPlayer.Source = null;
@@ -477,6 +480,9 @@ public partial class MainWindow : Window
 
     private async void PlayVideo(Uri uri, IReadOnlyDictionary<string, string>? headers = null, Uri? separateAudio = null)
     {
+        StopAudioDeck();
+        _pendingSeparateAudio = separateAudio;
+        _pendingAudioHeaders = headers;
         SaveCurrentResumePosition();
         _resumeSaveTimer.Stop();
         _currentVideoUrl = uri.AbsoluteUri;
@@ -493,10 +499,6 @@ public partial class MainWindow : Window
         VideoPlayer.Position = TimeSpan.Zero;
         VideoPlayer.Play();
 
-        // Start the independent audio deck immediately after VLC receives the video Play command,
-        // rather than starting audio while the video control is still waiting for its source.
-        if (separateAudio is not null)
-            PlaySeparateAudio(separateAudio, headers);
     }
 
     private void Window_PreviewKeyDown(object sender, System.Windows.Input.KeyEventArgs e)
@@ -646,6 +648,16 @@ public partial class MainWindow : Window
         else VideoPlayer.Position = TimeSpan.Zero;
 
         VideoPlayer.Play();
+        // Start separate audio only after the resume/restart choice is settled.
+        // VLC seeks the audio deck on its Playing event so both streams begin at the same position.
+        if (_pendingSeparateAudio is not null)
+        {
+            var audioUri = _pendingSeparateAudio;
+            var audioHeaders = _pendingAudioHeaders;
+            _pendingSeparateAudio = null;
+            _pendingAudioHeaders = null;
+            PlaySeparateAudio(audioUri, audioHeaders, VideoPlayer.Position);
+        }
         _resumeSaveTimer.Start();
         PlaybackControls.Visibility = Visibility.Visible;
         PlayPauseButton.Content = "إيقاف مؤقت";
@@ -864,6 +876,8 @@ public partial class MainWindow : Window
 
     private void ShowHome()
     {
+        _pendingSeparateAudio = null;
+        _pendingAudioHeaders = null;
         SaveCurrentResumePosition();
         _resumeSaveTimer.Stop();
         _controlsTimer.Stop();
