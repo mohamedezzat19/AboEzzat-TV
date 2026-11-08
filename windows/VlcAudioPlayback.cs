@@ -24,6 +24,8 @@ public sealed class VlcAudioPlayback : IDisposable
         _player = new MediaPlayer(_libVlc);
     }
 
+    public IReadOnlyDictionary<string, string>? RequestHeaders { get; set; }
+
     public Uri? Source
     {
         get => _source;
@@ -42,6 +44,7 @@ public sealed class VlcAudioPlayback : IDisposable
 
             _source = value;
             _media = new Media(_libVlc, value);
+            ApplyRequestHeaders(_media, RequestHeaders);
         }
     }
 
@@ -99,6 +102,29 @@ public sealed class VlcAudioPlayback : IDisposable
         _player.Stop();
         _media?.Dispose();
         _media = null;
+    }
+
+    private static void ApplyRequestHeaders(Media media, IReadOnlyDictionary<string, string>? headers)
+    {
+        if (headers is null) return;
+        if (TryGetHeader(headers, "User-Agent", out var userAgent))
+            media.AddOption($":http-user-agent={userAgent}");
+        if (TryGetHeader(headers, "Referer", out var referer))
+            media.AddOption($":http-referrer={referer}");
+    }
+
+    private static bool TryGetHeader(IReadOnlyDictionary<string, string> headers, string name, out string value)
+    {
+        foreach (var pair in headers)
+        {
+            if (string.Equals(pair.Key, name, StringComparison.OrdinalIgnoreCase))
+            {
+                value = pair.Value;
+                return !string.IsNullOrWhiteSpace(value);
+            }
+        }
+        value = string.Empty;
+        return false;
     }
 
     private void ThrowIfDisposed()
