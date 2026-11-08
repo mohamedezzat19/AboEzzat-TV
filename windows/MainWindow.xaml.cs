@@ -566,12 +566,14 @@ public partial class MainWindow : Window
         if (PlayPauseButton.Content?.ToString() == "تشغيل")
         {
             VideoPlayer.Play();
+            if (AudioPlayer.HasSource) AudioPlayer.Resume();
             PlayPauseButton.Content = "إيقاف مؤقت";
             ShowPlaybackControls();
         }
         else
         {
             VideoPlayer.Pause();
+            if (AudioPlayer.HasSource) AudioPlayer.Pause();
             PlayPauseButton.Content = "تشغيل";
             _controlsHideTimer.Stop();
             PlaybackControls.Visibility = Visibility.Visible;
@@ -581,19 +583,28 @@ public partial class MainWindow : Window
     private void Back10_Click(object sender, RoutedEventArgs e)
     {
         if (VideoPlayer.Source != null)
+        {
             VideoPlayer.Position = TimeSpan.FromSeconds(Math.Max(0, VideoPlayer.Position.TotalSeconds - 10));
+            if (AudioPlayer.HasSource) AudioPlayer.Seek(VideoPlayer.Position);
+        }
     }
 
     private void Forward10_Click(object sender, RoutedEventArgs e)
     {
         if (VideoPlayer.Source != null && VideoPlayer.NaturalDuration.HasTimeSpan)
+        {
             VideoPlayer.Position = TimeSpan.FromSeconds(Math.Min(VideoPlayer.NaturalDuration.TimeSpan.TotalSeconds, VideoPlayer.Position.TotalSeconds + 10));
+            if (AudioPlayer.HasSource) AudioPlayer.Seek(VideoPlayer.Position);
+        }
     }
 
     private void SeekSlider_MouseLeftButtonUp(object sender, System.Windows.Input.MouseButtonEventArgs e)
     {
         if (VideoPlayer.Source != null && VideoPlayer.NaturalDuration.HasTimeSpan)
+        {
             VideoPlayer.Position = TimeSpan.FromSeconds(VideoPlayer.NaturalDuration.TimeSpan.TotalSeconds * SeekSlider.Value / 100.0);
+            if (AudioPlayer.HasSource) AudioPlayer.Seek(VideoPlayer.Position);
+        }
     }
 
     private void VolumeSlider_ValueChanged(object sender, RoutedPropertyChangedEventArgs<double> e)
