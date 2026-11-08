@@ -30,7 +30,7 @@
    <Border x:Name="MediaPanel" Grid.Column="2" Background="#0D1634" CornerRadius="18" Padding="8">
     <Grid>
      <MediaElement x:Name="VideoPlayer" LoadedBehavior="Manual" UnloadedBehavior="Stop"
-                   Stretch="Uniform" MediaEnded="VideoPlayer_MediaEnded" Visibility="Collapsed"/>
+                   Stretch="Uniform" MediaOpened="VideoPlayer_MediaOpened" MediaEnded="VideoPlayer_MediaEnded" Visibility="Collapsed"/>
      <!-- Hidden second deck for separately supplied Cast audio. -->
      <MediaElement x:Name="AudioPlayer" Width="1" Height="1" Opacity="0" IsHitTestVisible="False"
                    LoadedBehavior="Manual" UnloadedBehavior="Stop" Visibility="Visible"/>
