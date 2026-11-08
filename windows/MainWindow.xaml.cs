@@ -229,14 +229,14 @@ public partial class MainWindow : Window
                 PlayVideo(videoUri, headers);
                 if (!string.IsNullOrWhiteSpace(audioUrl) && IsHttpUrl(audioUrl)
                     && Uri.TryCreate(audioUrl, UriKind.Absolute, out var audioUri))
-                    PlaySeparateAudio(audioUri);
+                    PlaySeparateAudio(audioUri, headers);
                 else StopAudioDeck();
             }
         }
         else if (!string.IsNullOrWhiteSpace(audioUrl) && IsHttpUrl(audioUrl)
             && Uri.TryCreate(audioUrl, UriKind.Absolute, out var audioOnlyUri))
         {
-            PlayAudioOnly(audioOnlyUri);
+            PlayAudioOnly(audioOnlyUri, headers);
         }
     }
 
@@ -289,16 +289,17 @@ public partial class MainWindow : Window
             ReceiveMedia(url, null);
     }
 
-    private void PlaySeparateAudio(Uri uri)
+    private void PlaySeparateAudio(Uri uri, IReadOnlyDictionary<string, string>? headers = null)
     {
         AudioPlayer.Stop();
         AudioPlayer.Source = null;
+        AudioPlayer.RequestHeaders = headers;
         AudioPlayer.Source = uri;
         AudioPlayer.Position = TimeSpan.Zero;
         AudioPlayer.Play();
     }
 
-    private void PlayAudioOnly(Uri uri)
+    private void PlayAudioOnly(Uri uri, IReadOnlyDictionary<string, string>? headers = null)
     {
         ExpandMediaForPlayback();
         VideoPlayer.Stop();
@@ -306,7 +307,7 @@ public partial class MainWindow : Window
         VideoPlayer.Visibility = Visibility.Collapsed;
         ReceivedImage.Visibility = Visibility.Collapsed;
         WelcomePanel.Visibility = Visibility.Collapsed;
-        PlaySeparateAudio(uri);
+        PlaySeparateAudio(uri, headers);
     }
 
     private void StopAudioDeck()
