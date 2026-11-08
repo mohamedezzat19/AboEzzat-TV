@@ -280,6 +280,7 @@ public partial class MainWindow : Window
     private void ShowHome()
     {
         RestoreHomeLayout();
+        StopAudioDeck();
         VideoPlayer.Stop();
         VideoPlayer.Source = null;
         VideoPlayer.Visibility = Visibility.Collapsed;
