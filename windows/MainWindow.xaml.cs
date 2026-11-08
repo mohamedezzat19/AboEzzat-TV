@@ -11,6 +11,7 @@ public partial class MainWindow : Window
     private HttpListener? _listener;
     private CancellationTokenSource? _serverCts;
     private bool _isFullscreen;
+    private bool _isMediaExpanded;
     private WindowStyle _savedStyle;
     private ResizeMode _savedResizeMode;
     private double _savedWidth, _savedHeight, _savedLeft, _savedTop;
@@ -84,20 +85,48 @@ public partial class MainWindow : Window
         }
     }
 
-    private void PlayVideo(Uri uri)
+    private async void PlayVideo(Uri uri)
     {
+        ExpandMediaForPlayback();
         ReceivedImage.Visibility = Visibility.Collapsed;
         VideoPlayer.Stop();
         VideoPlayer.Source = null;
         WelcomePanel.Visibility = Visibility.Collapsed;
         VideoPlayer.Visibility = Visibility.Visible;
+
+        // Give WPF MediaElement time to release the previous decoder/source.
+        await Task.Delay(120);
         VideoPlayer.Source = uri;
         VideoPlayer.Position = TimeSpan.Zero;
         VideoPlayer.Play();
     }
 
+    private void ExpandMediaForPlayback()
+    {
+        if (_isMediaExpanded) return;
+        _isMediaExpanded = true;
+        InfoColumn.Width = new GridLength(0);
+        GapColumn.Width = new GridLength(0);
+        InfoPanel.Visibility = Visibility.Collapsed;
+        StopButton.Margin = new Thickness(0, 8, 0, 0);
+        MediaPanel.Padding = new Thickness(0);
+        MediaPanel.CornerRadius = new CornerRadius(0);
+    }
+
+    private void RestoreHomeLayout()
+    {
+        _isMediaExpanded = false;
+        InfoColumn.Width = new GridLength(260);
+        GapColumn.Width = new GridLength(14);
+        InfoPanel.Visibility = Visibility.Visible;
+        StopButton.Margin = new Thickness(260, 8, 0, 0);
+        MediaPanel.Padding = new Thickness(16);
+        MediaPanel.CornerRadius = new CornerRadius(18);
+    }
+
     private void ShowImage(Uri uri)
     {
+        ExpandMediaForPlayback();
         VideoPlayer.Stop();
         VideoPlayer.Source = null;
         VideoPlayer.Visibility = Visibility.Collapsed;
@@ -117,6 +146,7 @@ public partial class MainWindow : Window
 
     private void ShowHome()
     {
+        RestoreHomeLayout();
         VideoPlayer.Stop();
         VideoPlayer.Source = null;
         VideoPlayer.Visibility = Visibility.Collapsed;
