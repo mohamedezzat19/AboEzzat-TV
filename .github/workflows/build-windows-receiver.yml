@@ -1,0 +1,35 @@
+name: Build AboEzzat TV WPF Receiver
+
+on:
+  push:
+    branches:
+      - feature/libvlc-header-playback
+    paths:
+      - "windows/**"
+      - ".github/workflows/build-windows-receiver.yml"
+  workflow_dispatch:
+
+jobs:
+  build-windows-receiver:
+    runs-on: windows-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup .NET 8
+        uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: "8.0.x"
+
+      - name: Restore
+        run: dotnet restore windows/AboEzzatReceiver.Windows.csproj
+
+      - name: Build
+        run: dotnet build windows/AboEzzatReceiver.Windows.csproj --configuration Release --no-restore
+
+      - name: Upload Windows receiver build
+        uses: actions/upload-artifact@v4
+        with:
+          name: AboEzzat-TV-Windows-Receiver
+          path: windows/bin/Release/net8.0-windows/
+          if-no-files-found: error
