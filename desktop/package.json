@@ -23,11 +23,11 @@
       "preload.js",
       "index.html",
       "package.json",
-      "build/icon.ico"
+      "aboezzat-tv-icon.ico"
     ],
     "win": {
       "target": ["nsis"],
-      "icon": "build/icon.ico"
+      "icon": "aboezzat-tv-icon.ico"
     }
   }
 }
