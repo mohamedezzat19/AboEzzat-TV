@@ -1,4 +1,4 @@
-name: Build AboEzzat TV WPF Receiver
+name: Build AboEzzat TV Windows Installer
 
 on:
   push:
@@ -6,11 +6,12 @@ on:
       - feature/libvlc-header-playback
     paths:
       - "windows/**"
+      - "installer/**"
       - ".github/workflows/build-windows-receiver.yml"
   workflow_dispatch:
 
 jobs:
-  build-windows-receiver:
+  build-windows-installer:
     runs-on: windows-latest
     steps:
       - name: Checkout
@@ -24,12 +25,23 @@ jobs:
       - name: Restore
         run: dotnet restore windows/AboEzzatReceiver.Windows.csproj
 
-      - name: Build
-        run: dotnet build windows/AboEzzatReceiver.Windows.csproj --configuration Release --no-restore
+      - name: Publish self-contained Windows x64 app
+        run: dotnet publish windows/AboEzzatReceiver.Windows.csproj --configuration Release --runtime win-x64 --self-contained true --no-restore -p:PublishSingleFile=false -o windows/publish/win-x64
 
-      - name: Upload Windows receiver build
+      - name: Install Inno Setup
+        run: choco install innosetup --yes --no-progress
+
+      - name: Build Setup.exe
+        shell: pwsh
+        run: |
+          $compiler = "${env:ProgramFiles(x86)}\Inno Setup 6\ISCC.exe"
+          if (!(Test-Path $compiler)) { throw "Inno Setup compiler not found: $compiler" }
+          & $compiler installer/AboEzzat-TV.iss /Oinstaller/Output
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+
+      - name: Upload Windows installer
         uses: actions/upload-artifact@v4
         with:
-          name: AboEzzat-TV-Windows-Receiver
-          path: windows/bin/Release/net8.0-windows/
+          name: AboEzzat-TV-Windows-Setup
+          path: installer/Output/AboEzzat-TV-Setup.exe
           if-no-files-found: error
