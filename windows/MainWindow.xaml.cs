@@ -226,11 +226,14 @@ public partial class MainWindow : Window
             }
             else
             {
-                PlayVideo(videoUri, headers);
                 if (!string.IsNullOrWhiteSpace(audioUrl) && IsHttpUrl(audioUrl)
                     && Uri.TryCreate(audioUrl, UriKind.Absolute, out var audioUri))
-                    PlaySeparateAudio(audioUri, headers);
-                else StopAudioDeck();
+                    PlayVideo(videoUri, headers, audioUri);
+                else
+                {
+                    StopAudioDeck();
+                    PlayVideo(videoUri, headers);
+                }
             }
         }
         else if (!string.IsNullOrWhiteSpace(audioUrl) && IsHttpUrl(audioUrl)
@@ -472,7 +475,7 @@ public partial class MainWindow : Window
         }
     }
 
-    private async void PlayVideo(Uri uri, IReadOnlyDictionary<string, string>? headers = null)
+    private async void PlayVideo(Uri uri, IReadOnlyDictionary<string, string>? headers = null, Uri? separateAudio = null)
     {
         SaveCurrentResumePosition();
         _resumeSaveTimer.Stop();
@@ -489,6 +492,11 @@ public partial class MainWindow : Window
         VideoPlayer.Source = uri;
         VideoPlayer.Position = TimeSpan.Zero;
         VideoPlayer.Play();
+
+        // Start the independent audio deck immediately after VLC receives the video Play command,
+        // rather than starting audio while the video control is still waiting for its source.
+        if (separateAudio is not null)
+            PlaySeparateAudio(separateAudio, headers);
     }
 
     private void Window_PreviewKeyDown(object sender, System.Windows.Input.KeyEventArgs e)
