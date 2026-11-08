@@ -59,7 +59,7 @@ public partial class MainWindow : Window
         _controlsHideTimer.Tick += (_, _) => HidePlaybackControlsIfNeeded();
         _resumeSaveTimer.Tick += (_, _) => SaveCurrentResumePosition();
         _imageSlideshowTimer.Tick += (_, _) => AdvanceImage(1);
-        Closed += (_, _) => { SaveCurrentResumePosition(); SaveResumePositions(); StopServer(); };
+        Closed += (_, _) => { SaveCurrentResumePosition(); SaveResumePositions(); StopServer(); VideoPlayer.Dispose(); };
     }
 
     private static string GetLocalIPv4()
@@ -129,7 +129,7 @@ public partial class MainWindow : Window
                     {
                         if (header.Value.ValueKind != JsonValueKind.String) continue;
                         var headerValue = header.Value.GetString();
-                        if (!string.IsNullOrWhiteSpace(headerValue) && !headerValue.Contains("\\r") && !headerValue.Contains("\\n"))
+                        if (!string.IsNullOrWhiteSpace(headerValue) && !headerValue.Contains('\r') && !headerValue.Contains('\n'))
                             mediaHeaders[header.Name] = headerValue;
                     }
                 }
