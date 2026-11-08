@@ -8,4 +8,8 @@
     <AssemblyName>AboEzzatReceiver.Windows</AssemblyName>
     <RootNamespace>AboEzzatReceiver.Windows</RootNamespace>
   </PropertyGroup>
+  <ItemGroup>
+    <PackageReference Include="LibVLCSharp.WPF" Version="3.10.2" />
+    <PackageReference Include="VideoLAN.LibVLC.Windows" Version="3.0.24" />
+  </ItemGroup>
 </Project>
