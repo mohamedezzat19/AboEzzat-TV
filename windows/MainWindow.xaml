@@ -36,6 +36,28 @@
      <MediaElement x:Name="AudioPlayer" Width="1" Height="1" Opacity="0" IsHitTestVisible="False"
                    LoadedBehavior="Manual" UnloadedBehavior="Stop" Visibility="Visible"/>
      <Image x:Name="ReceivedImage" Stretch="Uniform" Visibility="Collapsed"/>
+     <Border x:Name="ImageControls" HorizontalAlignment="Center" VerticalAlignment="Bottom"
+             Margin="12,0,12,12" Padding="10,8" Background="#DD101A35"
+             CornerRadius="12" Visibility="Collapsed">
+      <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
+       <Button Content="السابق" Click="ImagePrevious_Click" Margin="4,2" Padding="10,5"
+               Background="#25345D" Foreground="White" BorderThickness="0"/>
+       <TextBlock x:Name="ImagePositionText" Text="1 / 1" Foreground="White"
+                  VerticalAlignment="Center" Margin="8,0"/>
+       <Button Content="التالي" Click="ImageNext_Click" Margin="4,2" Padding="10,5"
+               Background="#25345D" Foreground="White" BorderThickness="0"/>
+       <Button x:Name="ImageSlideshowButton" Content="تشغيل العرض" Click="ImageSlideshow_Click"
+               Margin="4,2" Padding="10,5" Background="#238F70" Foreground="White" BorderThickness="0"/>
+       <TextBlock Text="المدة" Foreground="White" VerticalAlignment="Center" Margin="8,0,4,0"/>
+       <ComboBox x:Name="ImageInterval" Width="75" SelectedIndex="1"
+                 SelectionChanged="ImageInterval_SelectionChanged" VerticalAlignment="Center">
+        <ComboBoxItem Content="3 ثوانٍ" Tag="3"/>
+        <ComboBoxItem Content="5 ثوانٍ" Tag="5"/>
+        <ComboBoxItem Content="10 ثوانٍ" Tag="10"/>
+        <ComboBoxItem Content="15 ثانية" Tag="15"/>
+       </ComboBox>
+      </StackPanel>
+     </Border>
      <TextBlock x:Name="SubtitleOverlay" Visibility="Collapsed" HorizontalAlignment="Center" VerticalAlignment="Bottom" Margin="30,0,30,72" Padding="8,4" TextAlignment="Center" TextWrapping="Wrap" FontSize="26" FontWeight="SemiBold" Foreground="White" Background="#99000000" IsHitTestVisible="False"/>
      <Border x:Name="PlaybackControls" HorizontalAlignment="Stretch" VerticalAlignment="Bottom" Margin="12,0,12,12" Padding="10,8" Background="#DD101A35" CornerRadius="12" Visibility="Collapsed">
       <StackPanel>
