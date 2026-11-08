@@ -306,21 +306,40 @@ public partial class MainWindow : Window
         return Regex.IsMatch(name, @"(?i)^(index|master|playlist|video|stream|manifest|segment|file|media)$") ? "" : name;
     }
 
-    private static List<(TimeSpan Start, TimeSpan End, string Text)> ParseSrt(string srt)
+    private static List<(TimeSpan Start, TimeSpan End, string Text)> ParseSrt(string subtitleText)
     {
-        var list = new List<(TimeSpan, TimeSpan, string)>();
-        var blocks = Regex.Split(srt.Replace("\\r", ""), @"\n\s*\n");
+        // Normalize Windows, Unix and old-Mac line endings before splitting.
+        string normalized = subtitleText.TrimStart('\uFEFF')
+            .Replace("\\r\\n", "\\n").Replace('\\r', '\\n');
+        var list = new List<(TimeSpan Start, TimeSpan End, string Text)>();
+        var blocks = Regex.Split(normalized, @"\\n\\s*\\n");
+
         foreach (var block in blocks)
         {
-            var match = Regex.Match(block, @"(?<start>\d{2}:\d{2}:\d{2}[,.]\d{3})\s*-->\s*(?<end>\d{2}:\d{2}:\d{2}[,.]\d{3})");
+            // Accept SRT and WebVTT timestamp lines (VTT may include cue settings).
+            var match = Regex.Match(block,
+                @"(?<start>\\d{2}:\\d{2}:\\d{2}[,.]\\d{3})\\s*-->\\s*(?<end>\\d{2}:\\d{2}:\\d{2}[,.]\\d{3})");
             if (!match.Success) continue;
-            if (!TimeSpan.TryParse(match.Groups["start"].Value.Replace(',', '.'), out var start)
-                || !TimeSpan.TryParse(match.Groups["end"].Value.Replace(',', '.'), out var end)) continue;
-            string text = Regex.Replace(block[(match.Index + match.Length)..], @"(?m)^\s*\d+\s*$", "").Trim();
+
+            if (!TimeSpan.TryParse(match.Groups["start"].Value.Replace(',', '.'),
+                    System.Globalization.CultureInfo.InvariantCulture, out var start)
+                || !TimeSpan.TryParse(match.Groups["end"].Value.Replace(',', '.'),
+                    System.Globalization.CultureInfo.InvariantCulture, out var end)
+                || end <= start) continue;
+
+            string text = block[(match.Index + match.Length)..];
+            // Remove cue settings and common subtitle markup, retaining readable text.
+            text = Regex.Replace(text, @"(?m)^\\s*\\d+\\s*$", "");
             text = Regex.Replace(text, @"<[^>]+>", "");
-            if (!string.IsNullOrWhiteSpace(text)) list.Add((start, end, text));
+            text = Regex.Replace(text, @"(?m)^\\s*\\{\\\\an[1-9]\\}\\s*", "");
+            text = Regex.Replace(text, @"[ \\t]+(?=\\n)", "");
+            text = text.Trim();
+
+            if (!string.IsNullOrWhiteSpace(text))
+                list.Add((start, end, text));
         }
-        return list.OrderBy(x => x.Item1).ToList();
+
+        return list.OrderBy(x => x.Start).ToList();
     }
 
     private void UpdateSubtitleOverlay()
