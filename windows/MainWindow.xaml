@@ -59,25 +59,27 @@
        </ComboBox>
       </StackPanel>
      </Border>
-     <TextBlock x:Name="SubtitleOverlay" Visibility="Collapsed" HorizontalAlignment="Center" VerticalAlignment="Bottom" Margin="30,0,30,72" Padding="8,4" TextAlignment="Center" TextWrapping="Wrap" FontSize="26" FontWeight="SemiBold" Foreground="White" Background="#99000000" IsHitTestVisible="False"/>
-     <Border x:Name="PlaybackControls" HorizontalAlignment="Stretch" VerticalAlignment="Bottom" Margin="12,0,12,12" Padding="10,8" Background="#DD101A35" CornerRadius="12" Visibility="Collapsed">
-      <StackPanel>
-       <DockPanel LastChildFill="False">
-        <TextBlock x:Name="PlaybackTimeText" Text="00:00 / 00:00" Foreground="White" VerticalAlignment="Center" DockPanel.Dock="Left" Margin="0,0,10,0"/>
-        <Button x:Name="SubtitleButton" Content="ترجمة عربية" Click="Subtitle_Click" Padding="10,5" Background="#25345D" Foreground="White" BorderThickness="0" DockPanel.Dock="Right" ToolTip="ابحث عن ترجمة عربية للفيديو الحالي"/>
-       </DockPanel>
-       <Slider x:Name="SeekSlider" Minimum="0" Maximum="100" Value="0" Margin="0,4,0,2"
-               IsMoveToPointEnabled="True" PreviewMouseLeftButtonUp="SeekSlider_MouseLeftButtonUp"/>
-       <StackPanel Orientation="Horizontal" HorizontalAlignment="Center">
-        <Button Content="−10 ث" Click="Back10_Click" Margin="4,2" Padding="12,5" Background="#25345D" Foreground="White" BorderThickness="0"/>
-        <Button x:Name="PlayPauseButton" Content="إيقاف مؤقت" Click="PlayPause_Click" Margin="4,2" Padding="14,5" Background="#238F70" Foreground="White" BorderThickness="0"/>
-        <Button Content="+10 ث" Click="Forward10_Click" Margin="4,2" Padding="12,5" Background="#25345D" Foreground="White" BorderThickness="0"/>
-        <TextBlock Text="الصوت" Foreground="White" VerticalAlignment="Center" Margin="14,0,4,0"/>
-        <Slider x:Name="VolumeSlider" Width="110" Minimum="0" Maximum="1" Value="0.8" VerticalAlignment="Center" ValueChanged="VolumeSlider_ValueChanged"/>
-        <Button x:Name="MuteButton" Content="كتم" Click="Mute_Click" Margin="4,2" Padding="10,5" Background="#25345D" Foreground="White" BorderThickness="0"/>
-       </StackPanel>
-      </StackPanel>
-     </Border>
+     <Grid x:Name="VideoOverlayLayer" Background="#02000000" MouseMove="MediaPanel_MouseMove">
+      <TextBlock x:Name="SubtitleOverlay" Visibility="Collapsed" HorizontalAlignment="Center" VerticalAlignment="Bottom" Margin="30,0,30,72" Padding="8,4" TextAlignment="Center" TextWrapping="Wrap" FontSize="26" FontWeight="SemiBold" Foreground="White" Background="#99000000" IsHitTestVisible="False"/>
+           <Border x:Name="PlaybackControls" HorizontalAlignment="Stretch" VerticalAlignment="Bottom" Margin="12,0,12,12" Padding="10,8" Background="#DD101A35" CornerRadius="12" Visibility="Collapsed">
+            <StackPanel>
+             <DockPanel LastChildFill="False">
+              <TextBlock x:Name="PlaybackTimeText" Text="00:00 / 00:00" Foreground="White" VerticalAlignment="Center" DockPanel.Dock="Left" Margin="0,0,10,0"/>
+              <Button x:Name="SubtitleButton" Content="ترجمة عربية" Click="Subtitle_Click" Padding="10,5" Background="#25345D" Foreground="White" BorderThickness="0" DockPanel.Dock="Right" ToolTip="ابحث عن ترجمة عربية للفيديو الحالي"/>
+             </DockPanel>
+             <Slider x:Name="SeekSlider" Minimum="0" Maximum="100" Value="0" Margin="0,4,0,2"
+                     IsMoveToPointEnabled="True" PreviewMouseLeftButtonUp="SeekSlider_MouseLeftButtonUp"/>
+             <StackPanel Orientation="Horizontal" HorizontalAlignment="Center">
+              <Button Content="−10 ث" Click="Back10_Click" Margin="4,2" Padding="12,5" Background="#25345D" Foreground="White" BorderThickness="0"/>
+              <Button x:Name="PlayPauseButton" Content="إيقاف مؤقت" Click="PlayPause_Click" Margin="4,2" Padding="14,5" Background="#238F70" Foreground="White" BorderThickness="0"/>
+              <Button Content="+10 ث" Click="Forward10_Click" Margin="4,2" Padding="12,5" Background="#25345D" Foreground="White" BorderThickness="0"/>
+              <TextBlock Text="الصوت" Foreground="White" VerticalAlignment="Center" Margin="14,0,4,0"/>
+              <Slider x:Name="VolumeSlider" Width="110" Minimum="0" Maximum="1" Value="0.8" VerticalAlignment="Center" ValueChanged="VolumeSlider_ValueChanged"/>
+              <Button x:Name="MuteButton" Content="كتم" Click="Mute_Click" Margin="4,2" Padding="10,5" Background="#25345D" Foreground="White" BorderThickness="0"/>
+             </StackPanel>
+            </StackPanel>
+           </Border>
+     </Grid>
      <StackPanel x:Name="WelcomePanel" HorizontalAlignment="Center" VerticalAlignment="Center">
       <TextBlock Text="أبو عزت ريسيفر" FontSize="34" FontWeight="Bold" HorizontalAlignment="Center"/>
       <TextBlock Text="جاهز لاستقبال الفيديوهات والصور من AboEzzat Cast"
