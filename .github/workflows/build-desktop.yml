@@ -32,8 +32,18 @@ jobs:
             Start-Sleep -Seconds 20
             $attempt++
           }
-      - name: Build Windows app
-        run: npx electron-builder --win nsis
+      - name: Build Windows app (retry transient GitHub download failures)
+        shell: pwsh
+        run: |
+          $attempt = 1
+          while ($attempt -le 4) {
+            npx electron-builder --win nsis
+            if ($LASTEXITCODE -eq 0) { exit 0 }
+            if ($attempt -eq 4) { exit $LASTEXITCODE }
+            Write-Host "electron-builder failed (attempt $attempt). Waiting 30 seconds before retry..."
+            Start-Sleep -Seconds 30
+            $attempt++
+          }
       - name: Upload Windows build
         uses: actions/upload-artifact@v4
         with:
