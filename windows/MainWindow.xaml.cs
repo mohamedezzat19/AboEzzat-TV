@@ -146,21 +146,55 @@ public partial class MainWindow : Window
 
     private void ReceiveMedia(string? videoUrl, string? audioUrl)
     {
-        // Android Cast sends visual/audio separately within a short window.
-        // First stage: accept the protocol and play each direct URL; source mixing
-        // will be added with the dedicated Windows media engine.
-        if (!string.IsNullOrWhiteSpace(videoUrl) && IsHttpUrl(videoUrl))
+        // Cast may send video and audio as two independent URLs.
+        if (!string.IsNullOrWhiteSpace(videoUrl) && IsHttpUrl(videoUrl)
+            && Uri.TryCreate(videoUrl, UriKind.Absolute, out var videoUri))
         {
-            if (Uri.TryCreate(videoUrl, UriKind.Absolute, out var uri))
+            if (IsImageUrl(videoUri))
             {
-                if (IsImageUrl(uri)) ShowImage(uri);
-                else PlayVideo(uri);
+                StopAudioDeck();
+                ShowImage(videoUri);
+            }
+            else
+            {
+                PlayVideo(videoUri);
+                if (!string.IsNullOrWhiteSpace(audioUrl) && IsHttpUrl(audioUrl)
+                    && Uri.TryCreate(audioUrl, UriKind.Absolute, out var audioUri))
+                    PlaySeparateAudio(audioUri);
+                else StopAudioDeck();
             }
         }
-        else if (!string.IsNullOrWhiteSpace(audioUrl) && Uri.TryCreate(audioUrl, UriKind.Absolute, out var audioUri))
+        else if (!string.IsNullOrWhiteSpace(audioUrl) && IsHttpUrl(audioUrl)
+            && Uri.TryCreate(audioUrl, UriKind.Absolute, out var audioOnlyUri))
         {
-            PlayVideo(audioUri);
+            PlayAudioOnly(audioOnlyUri);
         }
+    }
+
+    private void PlaySeparateAudio(Uri uri)
+    {
+        AudioPlayer.Stop();
+        AudioPlayer.Source = null;
+        AudioPlayer.Source = uri;
+        AudioPlayer.Position = TimeSpan.Zero;
+        AudioPlayer.Play();
+    }
+
+    private void PlayAudioOnly(Uri uri)
+    {
+        ExpandMediaForPlayback();
+        VideoPlayer.Stop();
+        VideoPlayer.Source = null;
+        VideoPlayer.Visibility = Visibility.Collapsed;
+        ReceivedImage.Visibility = Visibility.Collapsed;
+        WelcomePanel.Visibility = Visibility.Collapsed;
+        PlaySeparateAudio(uri);
+    }
+
+    private void StopAudioDeck()
+    {
+        AudioPlayer.Stop();
+        AudioPlayer.Source = null;
     }
 
     private static bool IsImageUrl(Uri uri)
