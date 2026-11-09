@@ -23,6 +23,8 @@ public partial class MainWindow : Window
     private CancellationTokenSource? _serverCts;
     private UdpClient? _discoveryClient;
     private bool _isFullscreen;
+    private int _playRequestVersion;
+    private WindowState _savedWindowState = WindowState.Maximized;
     private readonly DispatcherTimer _imageSlideshowTimer = new() { Interval = TimeSpan.FromSeconds(5) };
     private readonly List<Uri> _imagePlaylist = new();
     private int _imageIndex;
@@ -241,7 +243,19 @@ public partial class MainWindow : Window
         else if (!string.IsNullOrWhiteSpace(audioUrl) && IsHttpUrl(audioUrl)
             && Uri.TryCreate(audioUrl, UriKind.Absolute, out var audioOnlyUri))
         {
-            PlayAudioOnly(audioOnlyUri, headers);
+            // Cast can deliver the audio companion after the video request.
+            if (!string.IsNullOrWhiteSpace(_currentVideoUrl) && VideoPlayer.Visibility == Visibility.Visible)
+            {
+                _pendingSeparateAudio = audioOnlyUri;
+                _pendingAudioHeaders = headers;
+                if (_resumePromptHandled && VideoPlayer.Source != null)
+                {
+                    _pendingSeparateAudio = null;
+                    _pendingAudioHeaders = null;
+                    PlaySeparateAudio(audioOnlyUri, headers, VideoPlayer.Position);
+                }
+            }
+            else PlayAudioOnly(audioOnlyUri, headers);
         }
     }
 
@@ -305,6 +319,15 @@ public partial class MainWindow : Window
 
     private void PlayAudioOnly(Uri uri, IReadOnlyDictionary<string, string>? headers = null)
     {
+        ++_playRequestVersion;
+        SaveCurrentResumePosition();
+        _resumeSaveTimer.Stop();
+        _controlsTimer.Stop();
+        _controlsHideTimer.Stop();
+        PlaybackControls.Visibility = Visibility.Collapsed;
+        ClearSubtitleOverlay();
+        _currentVideoUrl = null;
+        _resumePromptHandled = false;
         _pendingSeparateAudio = null;
         _pendingAudioHeaders = null;
         ExpandMediaForPlayback();
@@ -322,6 +345,14 @@ public partial class MainWindow : Window
         AudioPlayer.Source = null;
     }
 
+    private void ClearSubtitleOverlay()
+    {
+        _subtitleTimer.Stop();
+        _subtitleLines.Clear();
+        SubtitleOverlay.Text = "";
+        SubtitleOverlay.Visibility = Visibility.Collapsed;
+    }
+
     private async void Subtitle_Click(object sender, RoutedEventArgs e)
     {
         if (VideoPlayer.Source == null || VideoPlayer.Visibility != Visibility.Visible)
@@ -330,7 +361,9 @@ public partial class MainWindow : Window
             return;
         }
 
-        string title = GuessSubtitleTitle(VideoPlayer.Source);
+        Uri requestedVideo = VideoPlayer.Source;
+        string requestedVideoUrl = requestedVideo.AbsoluteUri;
+        string title = GuessSubtitleTitle(requestedVideo);
         if (string.IsNullOrWhiteSpace(title))
         {
             title = AskSubtitleTitle();
@@ -379,6 +412,14 @@ public partial class MainWindow : Window
                 subtitleText = await reader.ReadToEndAsync();
             }
             else subtitleText = Encoding.UTF8.GetString(subtitleBytes);
+
+            if (VideoPlayer.Source == null
+                || !string.Equals(VideoPlayer.Source.AbsoluteUri, requestedVideoUrl, StringComparison.OrdinalIgnoreCase)
+                || VideoPlayer.Visibility != Visibility.Visible)
+            {
+                MessageBox.Show("الفيديو اتغير أثناء البحث؛ لم يتم تطبيق الترجمة عليه.", "الترجمة العربية");
+                return;
+            }
 
             _subtitleLines = ParseSrt(subtitleText);
             if (_subtitleLines.Count == 0) throw new InvalidOperationException("ملف الترجمة فارغ أو غير مفهوم.");
@@ -480,11 +521,16 @@ public partial class MainWindow : Window
 
     private async void PlayVideo(Uri uri, IReadOnlyDictionary<string, string>? headers = null, Uri? separateAudio = null)
     {
+        int requestVersion = ++_playRequestVersion;
         StopAudioDeck();
         _pendingSeparateAudio = separateAudio;
         _pendingAudioHeaders = headers;
         SaveCurrentResumePosition();
         _resumeSaveTimer.Stop();
+        _controlsTimer.Stop();
+        _controlsHideTimer.Stop();
+        PlaybackControls.Visibility = Visibility.Collapsed;
+        ClearSubtitleOverlay();
         _currentVideoUrl = uri.AbsoluteUri;
         _resumePromptHandled = false;
         ExpandMediaForPlayback();
@@ -495,6 +541,10 @@ public partial class MainWindow : Window
         WelcomePanel.Visibility = Visibility.Collapsed;
         VideoPlayer.Visibility = Visibility.Visible;
         await Task.Delay(150);
+        // A newer Cast request may have arrived while the old source was clearing.
+        if (requestVersion != _playRequestVersion
+            || !string.Equals(_currentVideoUrl, uri.AbsoluteUri, StringComparison.OrdinalIgnoreCase))
+            return;
         VideoPlayer.Source = uri;
         VideoPlayer.Position = TimeSpan.Zero;
         VideoPlayer.Play();
