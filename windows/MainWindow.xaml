@@ -3,7 +3,7 @@
  xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
  Title="أبو عزت ريسيفر" Width="1280" Height="800" MinWidth="900" MinHeight="600"
  Focusable="True" PreviewKeyDown="Window_PreviewKeyDown"
- WindowStartupLocation="CenterScreen" Background="{StaticResource AppBackground}"
+ WindowStartupLocation="CenterScreen" WindowState="Maximized" Background="{StaticResource AppBackground}"
  Foreground="{StaticResource TextBrush}">
  <Grid Margin="22">
   <Grid.RowDefinitions><RowDefinition Height="56"/><RowDefinition Height="*"/><RowDefinition Height="42"/></Grid.RowDefinitions>
