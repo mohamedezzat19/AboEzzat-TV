@@ -179,6 +179,10 @@ public partial class MainWindow : Window
             await ctx.Response.OutputStream.WriteAsync(responseBytes);
 
             if (command is "ping" or "status") return;
+            if (accepted && !string.IsNullOrWhiteSpace(mediaUrl) && imageUrls.Count == 0
+                && await IsRemoteImageAsync(mediaUrl))
+                imageUrls.Add(mediaUrl);
+
             if (accepted && (!string.IsNullOrWhiteSpace(mediaUrl)
                 || !string.IsNullOrWhiteSpace(audioUrl) || imageUrls.Count > 0))
             {
@@ -210,6 +214,20 @@ public partial class MainWindow : Window
     private static bool IsHttpUrl(string? value) =>
         Uri.TryCreate(value, UriKind.Absolute, out var uri)
         && (uri.Scheme == Uri.UriSchemeHttp || uri.Scheme == Uri.UriSchemeHttps);
+
+    private static async Task<bool> IsRemoteImageAsync(string url)
+    {
+        try
+        {
+            using var http = new HttpClient { Timeout = TimeSpan.FromSeconds(8) };
+            http.DefaultRequestHeaders.UserAgent.ParseAdd("AboEzzat-TV/1.0");
+            using var request = new HttpRequestMessage(HttpMethod.Head, url);
+            using var response = await http.SendAsync(request, HttpCompletionOption.ResponseHeadersRead);
+            return response.IsSuccessStatusCode
+                && response.Content.Headers.ContentType?.MediaType?.StartsWith("image/", StringComparison.OrdinalIgnoreCase) == true;
+        }
+        catch { return false; }
+    }
 
     private void ReceiveMedia(string? videoUrl, string? audioUrl, IReadOnlyDictionary<string, string>? headers = null)
     {
@@ -950,7 +968,7 @@ public partial class MainWindow : Window
 
     private async void ShowImage(Uri uri)
     {
-        ++_playRequestVersion;
+        int imageRequestVersion = ++_playRequestVersion;
         SaveCurrentResumePosition();
         _resumeSaveTimer.Stop();
         _controlsTimer.Stop();
@@ -975,6 +993,7 @@ public partial class MainWindow : Window
             http.DefaultRequestHeaders.UserAgent.ParseAdd("AboEzzat-TV/1.0");
             http.DefaultRequestHeaders.Accept.ParseAdd("image/*");
             var bytes = await http.GetByteArrayAsync(uri);
+            if (imageRequestVersion != _playRequestVersion) return;
             using var stream = new MemoryStream(bytes);
             var bitmap = new BitmapImage();
             bitmap.BeginInit();
@@ -982,6 +1001,7 @@ public partial class MainWindow : Window
             bitmap.StreamSource = stream;
             bitmap.EndInit();
             bitmap.Freeze();
+            if (imageRequestVersion != _playRequestVersion) return;
             ReceivedImage.Source = bitmap;
             ReceivedImage.Visibility = Visibility.Visible;
         }
