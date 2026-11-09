@@ -856,6 +856,16 @@ public partial class MainWindow : Window
 
     private void ShowImage(Uri uri)
     {
+        ++_playRequestVersion;
+        SaveCurrentResumePosition();
+        _resumeSaveTimer.Stop();
+        _controlsTimer.Stop();
+        _controlsHideTimer.Stop();
+        PlaybackControls.Visibility = Visibility.Collapsed;
+        ClearSubtitleOverlay();
+        StopAudioDeck();
+        _currentVideoUrl = null;
+        _resumePromptHandled = false;
         ExpandMediaForPlayback();
         VideoPlayer.Stop();
         VideoPlayer.Source = null;
@@ -876,15 +886,14 @@ public partial class MainWindow : Window
 
     private void ShowHome()
     {
+        ++_playRequestVersion;
         SaveCurrentResumePosition();
         _resumeSaveTimer.Stop();
         _controlsTimer.Stop();
         _controlsHideTimer.Stop();
         PlaybackControls.Visibility = Visibility.Collapsed;
         RestoreHomeLayout();
-        _subtitleTimer.Stop();
-        _subtitleLines.Clear();
-        SubtitleOverlay.Text = ""; SubtitleOverlay.Visibility = Visibility.Collapsed;
+        ClearSubtitleOverlay();
         StopAudioDeck();
         VideoPlayer.Stop();
         VideoPlayer.Source = null;
@@ -906,14 +915,20 @@ public partial class MainWindow : Window
         if (!_isFullscreen)
         {
             _savedStyle = WindowStyle; _savedResizeMode = ResizeMode;
-            _savedWidth = Width; _savedHeight = Height; _savedLeft = Left; _savedTop = Top;
+            _savedWindowState = WindowState;
+            _savedWidth = RestoreBounds.Width; _savedHeight = RestoreBounds.Height;
+            _savedLeft = RestoreBounds.Left; _savedTop = RestoreBounds.Top;
             WindowStyle = WindowStyle.None; ResizeMode = ResizeMode.NoResize;
             WindowState = WindowState.Maximized; _isFullscreen = true;
         }
         else
         {
-            WindowState = WindowState.Normal; WindowStyle = _savedStyle; ResizeMode = _savedResizeMode;
-            Width = _savedWidth; Height = _savedHeight; Left = _savedLeft; Top = _savedTop;
+            WindowStyle = _savedStyle; ResizeMode = _savedResizeMode;
+            WindowState = _savedWindowState;
+            if (_savedWindowState == WindowState.Normal)
+            {
+                Width = _savedWidth; Height = _savedHeight; Left = _savedLeft; Top = _savedTop;
+            }
             _isFullscreen = false;
         }
     }
