@@ -70,12 +70,19 @@ function startHttpReceiver() {
       req.on("end", () => {
         try {
           const payload = JSON.parse(raw || "{}");
-          if (!isHttpUrl(payload.url)) {
+          const mediaUrl = payload.url || payload.video || null;
+          const audioUrl = payload.audio || null;
+          const hasVideo = mediaUrl != null && String(mediaUrl).trim() !== "";
+          const hasAudio = audioUrl != null && String(audioUrl).trim() !== "";
+          if ((!hasVideo && !hasAudio)
+              || (hasVideo && !isHttpUrl(mediaUrl))
+              || (hasAudio && !isHttpUrl(audioUrl))) {
             return jsonResponse(res, 400, { ok: false, error: "Invalid media URL" });
           }
           sendToWindow({
             type: "play",
-            url: payload.url,
+            url: hasVideo ? mediaUrl : null,
+            audio: hasAudio ? audioUrl : null,
             headers: payload.headers || {},
             receivedAt: Date.now()
           });
@@ -152,8 +159,13 @@ function createWindow() {
       nodeIntegration: false
     }
   });
+  // Receiver should open at a comfortable full-window size on desktop.
+  windowRef.maximize();
   windowRef.loadFile(path.join(__dirname, "index.html"));
 }
+
+// Incoming Cast requests are not mouse gestures, so allow automatic media playback.
+app.commandLine.appendSwitch("autoplay-policy", "no-user-gesture-required");
 
 app.whenReady().then(() => {
   createWindow();
