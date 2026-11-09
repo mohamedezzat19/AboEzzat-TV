@@ -4,92 +4,70 @@
  xmlns:local="clr-namespace:AboEzzatReceiver.Windows"
  Title="أبو عزت ريسيفر" Width="1280" Height="800" MinWidth="900" MinHeight="600"
  Focusable="True" PreviewKeyDown="Window_PreviewKeyDown"
- WindowStartupLocation="CenterScreen" WindowState="Maximized" Background="{StaticResource AppBackground}"
+ WindowStartupLocation="CenterScreen" WindowState="Maximized" Background="#030C20"
  Foreground="{StaticResource TextBrush}">
- <Grid Margin="22">
-  <Grid.RowDefinitions><RowDefinition Height="56"/><RowDefinition Height="*"/><RowDefinition Height="42"/></Grid.RowDefinitions>
-  <DockPanel Grid.Row="0" LastChildFill="False">
-   <TextBlock Text="أبو عزت ريسيفر" FontSize="24" FontWeight="Bold" VerticalAlignment="Center" DockPanel.Dock="Right"/>
-   <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
-    <Ellipse Width="8" Height="8" Fill="#55D6A5" Margin="0,0,8,0"/>
-    <TextBlock Text="خدمة الاستقبال تعمل" Foreground="#BFC7E8"/>
-   </StackPanel>
-  </DockPanel>
-  <Grid Grid.Row="1" Margin="0,14">
-   <Grid.ColumnDefinitions><ColumnDefinition x:Name="InfoColumn" Width="260"/><ColumnDefinition x:Name="GapColumn" Width="14"/><ColumnDefinition Width="*"/></Grid.ColumnDefinitions>
-   <Border x:Name="InfoPanel" Grid.Column="0" Background="{StaticResource PanelBackground}" CornerRadius="18" Padding="22">
-    <StackPanel>
-     <TextBlock Text="حالة الريسيفر" FontSize="23" FontWeight="Bold" Margin="0,12,0,20"/>
-     <TextBlock x:Name="IpText" Text="جاري تحديد عنوان IP..." Foreground="#55D6D0" FontSize="16" TextWrapping="Wrap"/>
-     <TextBlock Text="أبو عزت كاست: جاهز للاستقبال" Margin="0,22,0,0" Foreground="#C6CBE0"/>
-     <TextBlock Text="منفذ الاستقبال: 8081" Margin="0,12,0,0"/>
-     <TextBlock Text="اكتشاف الأجهزة: UDP 37020" Margin="0,12,0,0"/>
-     <TextBlock Text="آخر المشاهدات" FontSize="18" FontWeight="Bold" Margin="0,24,0,8"/>
-     <ListBox x:Name="HistoryList" Height="250" Background="#0D1634" Foreground="#E8E9F5" BorderThickness="0"
-              SelectionChanged="HistoryList_SelectionChanged" ScrollViewer.VerticalScrollBarVisibility="Auto"/>
-    </StackPanel>
-   </Border>
-   <Border x:Name="MediaPanel" Grid.Column="2" Background="#0D1634" CornerRadius="18" Padding="8" MouseMove="MediaPanel_MouseMove">
-    <Grid>
-     <local:VlcPlaybackPrototype x:Name="VideoPlayer"
-                   MediaOpened="VideoPlayer_MediaOpened" MediaEnded="VideoPlayer_MediaEnded" Visibility="Collapsed"/>
-     <Image x:Name="ReceivedImage" Stretch="Uniform" Visibility="Collapsed"/>
-     <Border x:Name="ImageControls" HorizontalAlignment="Center" VerticalAlignment="Bottom"
-             Margin="12,0,12,12" Padding="10,8" Background="#DD101A35"
-             CornerRadius="12" Visibility="Collapsed">
-      <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
-       <Button Content="السابق" Click="ImagePrevious_Click" Margin="4,2" Padding="10,5"
-               Background="#25345D" Foreground="White" BorderThickness="0"/>
-       <TextBlock x:Name="ImagePositionText" Text="1 / 1" Foreground="White"
-                  VerticalAlignment="Center" Margin="8,0"/>
-       <Button Content="التالي" Click="ImageNext_Click" Margin="4,2" Padding="10,5"
-               Background="#25345D" Foreground="White" BorderThickness="0"/>
-       <Button x:Name="ImageSlideshowButton" Content="تشغيل العرض" Click="ImageSlideshow_Click"
-               Margin="4,2" Padding="10,5" Background="#238F70" Foreground="White" BorderThickness="0"/>
-       <TextBlock Text="المدة" Foreground="White" VerticalAlignment="Center" Margin="8,0,4,0"/>
-       <ComboBox x:Name="ImageInterval" Width="75" SelectedIndex="1"
-                 SelectionChanged="ImageInterval_SelectionChanged" VerticalAlignment="Center">
-        <ComboBoxItem Content="3 ثوانٍ" Tag="3"/>
-        <ComboBoxItem Content="5 ثوانٍ" Tag="5"/>
-        <ComboBoxItem Content="10 ثوانٍ" Tag="10"/>
-        <ComboBoxItem Content="15 ثانية" Tag="15"/>
-       </ComboBox>
+ <Grid Margin="0">
+  <Grid.ColumnDefinitions>
+   <ColumnDefinition x:Name="InfoColumn" Width="0"/>
+   <ColumnDefinition x:Name="GapColumn" Width="0"/>
+   <ColumnDefinition Width="*"/>
+  </Grid.ColumnDefinitions>
+  <Border x:Name="MediaPanel" Grid.ColumnSpan="3" Background="#030C20" Padding="0" CornerRadius="0" MouseMove="MediaPanel_MouseMove">
+   <Grid ClipToBounds="True">
+    <local:VlcPlaybackPrototype x:Name="VideoPlayer" MediaOpened="VideoPlayer_MediaOpened" MediaEnded="VideoPlayer_MediaEnded" Visibility="Collapsed"/>
+    <Image x:Name="ReceivedImage" Stretch="Uniform" Visibility="Collapsed"/>
+    <Grid x:Name="VideoOverlayLayer" Background="#02000000" MouseMove="MediaPanel_MouseMove">
+     <TextBlock x:Name="SubtitleOverlay" Visibility="Collapsed" HorizontalAlignment="Center" VerticalAlignment="Bottom" Margin="30,0,30,72" Padding="8,4" TextAlignment="Center" TextWrapping="Wrap" FontSize="26" FontWeight="SemiBold" Foreground="White" Background="#99000000" IsHitTestVisible="False"/>
+     <Border x:Name="PlaybackControls" HorizontalAlignment="Stretch" VerticalAlignment="Bottom" Margin="20,0,20,18" Padding="12,10" Background="#DD101A35" CornerRadius="14" Visibility="Collapsed">
+      <StackPanel>
+       <DockPanel LastChildFill="False">
+        <TextBlock x:Name="PlaybackTimeText" Text="00:00 / 00:00" Foreground="White" VerticalAlignment="Center" DockPanel.Dock="Left" Margin="0,0,10,0"/>
+        <Button x:Name="SubtitleButton" Content="ترجمة عربية" Click="Subtitle_Click" Padding="10,5" Background="#25345D" Foreground="White" BorderThickness="0" DockPanel.Dock="Right" ToolTip="ابحث عن ترجمة عربية للفيديو الحالي"/>
+       </DockPanel>
+       <Slider x:Name="SeekSlider" Minimum="0" Maximum="100" Value="0" Margin="0,4,0,2" IsMoveToPointEnabled="True" PreviewMouseLeftButtonUp="SeekSlider_MouseLeftButtonUp"/>
+       <StackPanel Orientation="Horizontal" HorizontalAlignment="Center">
+        <Button Content="−10 ث" Click="Back10_Click" Margin="4,2" Padding="12,5" Background="#25345D" Foreground="White" BorderThickness="0"/>
+        <Button x:Name="PlayPauseButton" Content="إيقاف مؤقت" Click="PlayPause_Click" Margin="4,2" Padding="14,5" Background="#238F70" Foreground="White" BorderThickness="0"/>
+        <Button Content="+10 ث" Click="Forward10_Click" Margin="4,2" Padding="12,5" Background="#25345D" Foreground="White" BorderThickness="0"/>
+        <TextBlock Text="الصوت" Foreground="White" VerticalAlignment="Center" Margin="14,0,4,0"/>
+        <Slider x:Name="VolumeSlider" Width="110" Minimum="0" Maximum="1" Value="0.8" VerticalAlignment="Center" ValueChanged="VolumeSlider_ValueChanged"/>
+        <Button x:Name="MuteButton" Content="كتم" Click="Mute_Click" Margin="4,2" Padding="10,5" Background="#25345D" Foreground="White" BorderThickness="0"/>
+       </StackPanel>
       </StackPanel>
      </Border>
-     <Grid x:Name="VideoOverlayLayer" Background="#02000000" MouseMove="MediaPanel_MouseMove">
-      <TextBlock x:Name="SubtitleOverlay" Visibility="Collapsed" HorizontalAlignment="Center" VerticalAlignment="Bottom" Margin="30,0,30,72" Padding="8,4" TextAlignment="Center" TextWrapping="Wrap" FontSize="26" FontWeight="SemiBold" Foreground="White" Background="#99000000" IsHitTestVisible="False"/>
-           <Border x:Name="PlaybackControls" HorizontalAlignment="Stretch" VerticalAlignment="Bottom" Margin="12,0,12,12" Padding="10,8" Background="#DD101A35" CornerRadius="12" Visibility="Collapsed">
-            <StackPanel>
-             <DockPanel LastChildFill="False">
-              <TextBlock x:Name="PlaybackTimeText" Text="00:00 / 00:00" Foreground="White" VerticalAlignment="Center" DockPanel.Dock="Left" Margin="0,0,10,0"/>
-              <Button x:Name="SubtitleButton" Content="ترجمة عربية" Click="Subtitle_Click" Padding="10,5" Background="#25345D" Foreground="White" BorderThickness="0" DockPanel.Dock="Right" ToolTip="ابحث عن ترجمة عربية للفيديو الحالي"/>
-             </DockPanel>
-             <Slider x:Name="SeekSlider" Minimum="0" Maximum="100" Value="0" Margin="0,4,0,2"
-                     IsMoveToPointEnabled="True" PreviewMouseLeftButtonUp="SeekSlider_MouseLeftButtonUp"/>
-             <StackPanel Orientation="Horizontal" HorizontalAlignment="Center">
-              <Button Content="−10 ث" Click="Back10_Click" Margin="4,2" Padding="12,5" Background="#25345D" Foreground="White" BorderThickness="0"/>
-              <Button x:Name="PlayPauseButton" Content="إيقاف مؤقت" Click="PlayPause_Click" Margin="4,2" Padding="14,5" Background="#238F70" Foreground="White" BorderThickness="0"/>
-              <Button Content="+10 ث" Click="Forward10_Click" Margin="4,2" Padding="12,5" Background="#25345D" Foreground="White" BorderThickness="0"/>
-              <TextBlock Text="الصوت" Foreground="White" VerticalAlignment="Center" Margin="14,0,4,0"/>
-              <Slider x:Name="VolumeSlider" Width="110" Minimum="0" Maximum="1" Value="0.8" VerticalAlignment="Center" ValueChanged="VolumeSlider_ValueChanged"/>
-              <Button x:Name="MuteButton" Content="كتم" Click="Mute_Click" Margin="4,2" Padding="10,5" Background="#25345D" Foreground="White" BorderThickness="0"/>
-             </StackPanel>
-            </StackPanel>
-           </Border>
-     </Grid>
-     <StackPanel x:Name="WelcomePanel" HorizontalAlignment="Center" VerticalAlignment="Center">
-      <TextBlock Text="أبو عزت ريسيفر" FontSize="34" FontWeight="Bold" HorizontalAlignment="Center"/>
-      <TextBlock Text="جاهز لاستقبال الفيديوهات والصور من AboEzzat Cast"
-                 Margin="0,14,0,0" FontSize="17" Foreground="#AEB9DC" HorizontalAlignment="Center"/>
-     </StackPanel>
-     <Button Content="⛶" Width="44" Height="40" HorizontalAlignment="Right" VerticalAlignment="Top"
-             Click="Fullscreen_Click" Background="#25345D" Foreground="White" BorderThickness="0"
-             ToolTip="ملء الشاشة"/>
     </Grid>
-   </Border>
-  </Grid>
-  <Button Grid.Row="2" x:Name="StopButton" Content="إيقاف التشغيل" Click="Stop_Click"
-          Background="{StaticResource AccentBrush}" Foreground="White" BorderThickness="0"
-          HorizontalAlignment="Stretch" Margin="260,8,0,0"/>
+    <StackPanel x:Name="WelcomePanel" HorizontalAlignment="Center" VerticalAlignment="Center">
+     <TextBlock Text="أبو عزت ريسيفر" FontSize="42" FontWeight="Bold" HorizontalAlignment="Center"/>
+     <TextBlock Text="جاهز لاستقبال الفيديوهات والصور من AboEzzat Cast" Margin="0,14,0,0" FontSize="18" Foreground="#AEB9DC" HorizontalAlignment="Center"/>
+    </StackPanel>
+    <Border x:Name="ImageControls" HorizontalAlignment="Center" VerticalAlignment="Bottom" Margin="12,0,12,18" Padding="10,8" Background="#DD101A35" CornerRadius="12" Visibility="Collapsed">
+     <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
+      <Button Content="السابق" Click="ImagePrevious_Click" Margin="4,2" Padding="10,5" Background="#25345D" Foreground="White" BorderThickness="0"/>
+      <TextBlock x:Name="ImagePositionText" Text="1 / 1" Foreground="White" VerticalAlignment="Center" Margin="8,0"/>
+      <Button Content="التالي" Click="ImageNext_Click" Margin="4,2" Padding="10,5" Background="#25345D" Foreground="White" BorderThickness="0"/>
+      <Button x:Name="ImageSlideshowButton" Content="تشغيل العرض" Click="ImageSlideshow_Click" Margin="4,2" Padding="10,5" Background="#238F70" Foreground="White" BorderThickness="0"/>
+      <TextBlock Text="المدة" Foreground="White" VerticalAlignment="Center" Margin="8,0,4,0"/>
+      <ComboBox x:Name="ImageInterval" Width="75" SelectedIndex="1" SelectionChanged="ImageInterval_SelectionChanged" VerticalAlignment="Center">
+       <ComboBoxItem Content="3 ثوانٍ" Tag="3"/><ComboBoxItem Content="5 ثوانٍ" Tag="5"/><ComboBoxItem Content="10 ثوانٍ" Tag="10"/><ComboBoxItem Content="15 ثانية" Tag="15"/>
+      </ComboBox>
+     </StackPanel>
+    </Border>
+    <Button Content="⛶" Width="44" Height="40" HorizontalAlignment="Right" VerticalAlignment="Top" Margin="0,12,12,0"
+            Click="Fullscreen_Click" Background="#25345D" Foreground="White" BorderThickness="0" ToolTip="ملء الشاشة"/>
+    <!-- Compact Android-Receiver-style connection card: shown only on the home screen. -->
+    <Border x:Name="InfoPanel" HorizontalAlignment="Right" VerticalAlignment="Bottom" Margin="0,0,24,24"
+            Background="#E8050C20" BorderBrush="#FFC54A" BorderThickness="1" CornerRadius="16" Padding="18,12">
+     <StackPanel Width="260">
+      <TextBlock Text="ABO EZZAT • RECEIVER" Foreground="#FFCF5E" FontSize="11" FontWeight="Bold"/>
+      <TextBlock Text="أهلاً بك يا أبو عزت" FontSize="20" FontWeight="Bold" Margin="0,5,0,0"/>
+      <TextBlock Text="● الاستقبال يعمل — جاهز للاستقبال" Foreground="#FFDE97" Margin="0,6,0,0"/>
+      <TextBlock x:Name="IpText" Text="جاري تحديد عنوان IP..." Foreground="#55D6D0" FontSize="16" Margin="0,6,0,0" TextWrapping="Wrap"/>
+      <TextBlock Text="منفذ الاستقبال: 8081" Foreground="#C6CBE0" Margin="0,3,0,0"/>
+      <ListBox x:Name="HistoryList" Height="0" Visibility="Collapsed" SelectionChanged="HistoryList_SelectionChanged"/>
+     </StackPanel>
+    </Border>
+    <Button x:Name="StopButton" Content="إيقاف التشغيل" Click="Stop_Click" Visibility="Collapsed"/>
+   </Grid>
+  </Border>
  </Grid>
 </Window>
