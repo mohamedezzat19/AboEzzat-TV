@@ -325,7 +325,9 @@ public partial class MainWindow : Window
             return;
         }
 
-        string title = GuessSubtitleTitle(VideoPlayer.Source);
+        Uri requestedVideo = VideoPlayer.Source;
+        string requestedVideoUrl = requestedVideo.AbsoluteUri;
+        string title = GuessSubtitleTitle(requestedVideo);
         if (string.IsNullOrWhiteSpace(title))
         {
             title = AskSubtitleTitle();
@@ -374,6 +376,15 @@ public partial class MainWindow : Window
                 subtitleText = await reader.ReadToEndAsync();
             }
             else subtitleText = Encoding.UTF8.GetString(subtitleBytes);
+
+            // Prevent a late subtitle response from attaching to a different video.
+            if (VideoPlayer.Source == null
+                || !string.Equals(VideoPlayer.Source.AbsoluteUri, requestedVideoUrl, StringComparison.OrdinalIgnoreCase)
+                || VideoPlayer.Visibility != Visibility.Visible)
+            {
+                MessageBox.Show("الفيديو اتغير أثناء البحث؛ لم يتم تطبيق الترجمة عليه.", "الترجمة العربية");
+                return;
+            }
 
             _subtitleLines = ParseSrt(subtitleText);
             if (_subtitleLines.Count == 0) throw new InvalidOperationException("ملف الترجمة فارغ أو غير مفهوم.");
