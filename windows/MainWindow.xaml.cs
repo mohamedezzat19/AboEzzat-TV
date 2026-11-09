@@ -486,8 +486,13 @@ public partial class MainWindow : Window
 
     private async void PlayVideo(Uri uri)
     {
+        int requestVersion = ++_playRequestVersion;
         SaveCurrentResumePosition();
         _resumeSaveTimer.Stop();
+        _controlsTimer.Stop();
+        _controlsHideTimer.Stop();
+        PlaybackControls.Visibility = Visibility.Collapsed;
+        ClearSubtitleOverlay();
         _currentVideoUrl = uri.AbsoluteUri;
         _resumePromptHandled = false;
         ExpandMediaForPlayback();
@@ -497,6 +502,10 @@ public partial class MainWindow : Window
         WelcomePanel.Visibility = Visibility.Collapsed;
         VideoPlayer.Visibility = Visibility.Visible;
         await Task.Delay(150);
+        // Discard this delayed start if a newer Cast request has arrived.
+        if (requestVersion != _playRequestVersion
+            || !string.Equals(_currentVideoUrl, uri.AbsoluteUri, StringComparison.OrdinalIgnoreCase))
+            return;
         VideoPlayer.Source = uri;
         VideoPlayer.Position = TimeSpan.Zero;
         VideoPlayer.Play();
