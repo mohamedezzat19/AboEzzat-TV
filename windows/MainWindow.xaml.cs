@@ -19,6 +19,8 @@ public partial class MainWindow : Window
     private CancellationTokenSource? _serverCts;
     private UdpClient? _discoveryClient;
     private bool _isFullscreen;
+    private int _playRequestVersion;
+    private WindowState _savedWindowState = WindowState.Maximized;
     private readonly DispatcherTimer _imageSlideshowTimer = new() { Interval = TimeSpan.FromSeconds(5) };
     private readonly List<Uri> _imagePlaylist = new();
     private int _imageIndex;
@@ -283,6 +285,15 @@ public partial class MainWindow : Window
 
     private void PlayAudioOnly(Uri uri)
     {
+        ++_playRequestVersion;
+        SaveCurrentResumePosition();
+        _resumeSaveTimer.Stop();
+        _controlsTimer.Stop();
+        _controlsHideTimer.Stop();
+        PlaybackControls.Visibility = Visibility.Collapsed;
+        ClearSubtitleOverlay();
+        _currentVideoUrl = null;
+        _resumePromptHandled = false;
         ExpandMediaForPlayback();
         VideoPlayer.Stop();
         VideoPlayer.Source = null;
@@ -296,6 +307,14 @@ public partial class MainWindow : Window
     {
         AudioPlayer.Stop();
         AudioPlayer.Source = null;
+    }
+
+    private void ClearSubtitleOverlay()
+    {
+        _subtitleTimer.Stop();
+        _subtitleLines.Clear();
+        SubtitleOverlay.Text = "";
+        SubtitleOverlay.Visibility = Visibility.Collapsed;
     }
 
     private async void Subtitle_Click(object sender, RoutedEventArgs e)
