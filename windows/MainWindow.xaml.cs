@@ -498,9 +498,18 @@ public partial class MainWindow : Window
 
     private static bool IsImageUrl(Uri uri)
     {
-        var path = uri.AbsolutePath.ToLowerInvariant();
+        // Social media image links often have no extension or encode the image
+        // format in query parameters (for example ?format=jpg or mime=image/jpeg).
+        var path = Uri.UnescapeDataString(uri.AbsolutePath).ToLowerInvariant();
+        var query = Uri.UnescapeDataString(uri.Query).ToLowerInvariant();
+        var full = Uri.UnescapeDataString(uri.AbsoluteUri).ToLowerInvariant();
         return path.EndsWith(".jpg") || path.EndsWith(".jpeg") || path.EndsWith(".png")
-            || path.EndsWith(".webp") || path.EndsWith(".gif") || path.EndsWith(".bmp");
+            || path.EndsWith(".webp") || path.EndsWith(".gif") || path.EndsWith(".bmp")
+            || path.EndsWith(".avif") || path.EndsWith(".heic") || path.EndsWith(".heif")
+            || path.EndsWith(".tif") || path.EndsWith(".tiff")
+            || Regex.IsMatch(query, @"(?:^|[&?])(?:format|fm|type)=(?:jpg|jpeg|png|webp|gif|bmp|avif|heic|heif)(?:&|$)")
+            || query.Contains("mime=image/") || query.Contains("media_type=image/")
+            || full.Contains("mime=image%2f") || full.Contains("media_type=image%2f");
     }
 
     private async Task DiscoveryLoopAsync(CancellationToken token)
@@ -832,20 +841,44 @@ public partial class MainWindow : Window
         InfoColumn.Width = new GridLength(0);
         GapColumn.Width = new GridLength(0);
         InfoPanel.Visibility = Visibility.Collapsed;
-        StopButton.Margin = new Thickness(0, 8, 0, 0);
+        StopButton.Visibility = Visibility.Collapsed;
         MediaPanel.Padding = new Thickness(0);
         MediaPanel.CornerRadius = new CornerRadius(0);
+
+        // Android Receiver switches to a clean, edge-to-edge media screen.
+        _savedStyle = WindowStyle;
+        _savedResizeMode = ResizeMode;
+        _savedWindowState = WindowState;
+        _savedWidth = RestoreBounds.Width;
+        _savedHeight = RestoreBounds.Height;
+        _savedLeft = RestoreBounds.Left;
+        _savedTop = RestoreBounds.Top;
+        WindowStyle = WindowStyle.None;
+        ResizeMode = ResizeMode.NoResize;
+        WindowState = WindowState.Maximized;
+        _isFullscreen = true;
     }
 
     private void RestoreHomeLayout()
     {
         _isMediaExpanded = false;
-        InfoColumn.Width = new GridLength(260);
-        GapColumn.Width = new GridLength(14);
+        if (_isFullscreen)
+        {
+            WindowStyle = _savedStyle;
+            ResizeMode = _savedResizeMode;
+            WindowState = _savedWindowState;
+            if (_savedWindowState == WindowState.Normal)
+            {
+                Width = _savedWidth; Height = _savedHeight; Left = _savedLeft; Top = _savedTop;
+            }
+            _isFullscreen = false;
+        }
+        InfoColumn.Width = new GridLength(0);
+        GapColumn.Width = new GridLength(0);
         InfoPanel.Visibility = Visibility.Visible;
-        StopButton.Margin = new Thickness(260, 8, 0, 0);
-        MediaPanel.Padding = new Thickness(16);
-        MediaPanel.CornerRadius = new CornerRadius(18);
+        StopButton.Visibility = Visibility.Collapsed;
+        MediaPanel.Padding = new Thickness(0);
+        MediaPanel.CornerRadius = new CornerRadius(0);
     }
 
     private void StartImagePlaylist(IEnumerable<string> urls)
@@ -915,7 +948,7 @@ public partial class MainWindow : Window
         ImageSlideshowButton.Content = _imageSlideshowEnabled ? "إيقاف العرض" : "تشغيل العرض";
     }
 
-    private void ShowImage(Uri uri)
+    private async void ShowImage(Uri uri)
     {
         ++_playRequestVersion;
         SaveCurrentResumePosition();
@@ -936,15 +969,27 @@ public partial class MainWindow : Window
         WelcomePanel.Visibility = Visibility.Collapsed;
         try
         {
+            // Download to a local stream rather than relying on WPF's direct URI
+            // loader; social CDN URLs may redirect or contain long query strings.
+            using var http = new HttpClient { Timeout = TimeSpan.FromSeconds(30) };
+            http.DefaultRequestHeaders.UserAgent.ParseAdd("AboEzzat-TV/1.0");
+            http.DefaultRequestHeaders.Accept.ParseAdd("image/*");
+            var bytes = await http.GetByteArrayAsync(uri);
+            using var stream = new MemoryStream(bytes);
             var bitmap = new BitmapImage();
             bitmap.BeginInit();
-            bitmap.UriSource = uri;
             bitmap.CacheOption = BitmapCacheOption.OnLoad;
+            bitmap.StreamSource = stream;
             bitmap.EndInit();
+            bitmap.Freeze();
             ReceivedImage.Source = bitmap;
             ReceivedImage.Visibility = Visibility.Visible;
         }
-        catch { ShowHome(); }
+        catch (Exception ex)
+        {
+            System.Diagnostics.Debug.WriteLine($"Image load failed ({uri}): {ex}");
+            ShowHome();
+        }
     }
 
     private void ShowHome()
