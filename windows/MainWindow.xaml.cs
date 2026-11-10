@@ -6,6 +6,7 @@ using System.Net.Sockets;
 using System.Text;
 using System.Text.Json;
 using System.Text.RegularExpressions;
+using System.Threading.Channels;
 using System.Windows.Threading;
 using System.Windows;
 using System.Windows.Media;
@@ -20,6 +21,10 @@ public partial class MainWindow : Window
     private const string DiscoveryGroup = "239.255.42.99";
     private readonly VlcAudioPlayback AudioPlayer;
     private HttpListener? _listener;
+    // Keep HTTP request handling FIFO: remote-image HEAD checks can complete out of order,
+    // otherwise an older Cast URL could be dispatched after a newer one and replace it.
+    private readonly Channel<HttpListenerContext> _incomingRequests = Channel.CreateUnbounded<HttpListenerContext>(
+        new UnboundedChannelOptions { SingleReader = true, SingleWriter = true });
     private CancellationTokenSource? _serverCts;
     private UdpClient? _discoveryClient;
     private bool _isFullscreen;
@@ -91,6 +96,7 @@ public partial class MainWindow : Window
             _listener.Prefixes.Add($"http://127.0.0.1:{ReceiverPort}/");
             _listener.Start();
             _ = Task.Run(() => ListenLoopAsync(_serverCts.Token));
+            _ = Task.Run(() => ProcessIncomingRequestsAsync(_serverCts.Token));
             _ = Task.Run(() => DiscoveryLoopAsync(_serverCts.Token));
         }
         catch (Exception ex)
@@ -106,10 +112,32 @@ public partial class MainWindow : Window
         {
             HttpListenerContext ctx;
             try { ctx = await _listener.GetContextAsync(); }
-            catch when (token.IsCancellationRequested) { break; }
-            catch { break; }
-            _ = Task.Run(() => HandleHttpRequestAsync(ctx));
+            catch (Exception ex)
+            {
+                if (token.IsCancellationRequested || _listener?.IsListening != true) break;
+                // A malformed/disconnected client must not permanently stop the receiver.
+                System.Diagnostics.Debug.WriteLine($"HTTP accept error; receiver remains active: {ex.Message}");
+                continue;
+            }
+
+            if (!_incomingRequests.Writer.TryWrite(ctx))
+            {
+                try { ctx.Response.Close(); } catch { }
+            }
         }
+        _incomingRequests.Writer.TryComplete();
+    }
+
+    private async Task ProcessIncomingRequestsAsync(CancellationToken token)
+    {
+        try
+        {
+            // Process in socket-accept order. A delayed image-detection request must not
+            // let an older video overwrite a more recent Cast send.
+            await foreach (var ctx in _incomingRequests.Reader.ReadAllAsync(token))
+                await HandleHttpRequestAsync(ctx);
+        }
+        catch (OperationCanceledException) when (token.IsCancellationRequested) { }
     }
 
     // Compatible with Android Receiver's HTTP contract:
@@ -1065,6 +1093,15 @@ public partial class MainWindow : Window
 
     private void StopServer()
     {
-        try { _serverCts?.Cancel(); _listener?.Stop(); _listener?.Close(); } catch { }
+        try
+        {
+            _serverCts?.Cancel();
+            _incomingRequests.Writer.TryComplete();
+            while (_incomingRequests.Reader.TryRead(out var pending))
+                try { pending.Response.Close(); } catch { }
+            _listener?.Stop();
+            _listener?.Close();
+        }
+        catch { }
     }
 }
