@@ -205,10 +205,13 @@ public partial class MainWindow : Window
             var responseBytes = Encoding.UTF8.GetBytes(responseText);
             ctx.Response.ContentLength64 = responseBytes.Length;
             await ctx.Response.OutputStream.WriteAsync(responseBytes);
+            // The custom TCP listener transmits the buffered response on Close().
+            // Acknowledge Cast before any optional CDN image probe so the sender does not time out.
+            ctx.Response.Close();
 
             if (command is "ping" or "status") return;
             if (accepted && !string.IsNullOrWhiteSpace(mediaUrl) && imageUrls.Count == 0
-                && await IsRemoteImageAsync(mediaUrl))
+                && ShouldProbeRemoteImage(mediaUrl) && await IsRemoteImageAsync(mediaUrl))
                 imageUrls.Add(mediaUrl);
 
             if (accepted && (!string.IsNullOrWhiteSpace(mediaUrl)
@@ -243,11 +246,24 @@ public partial class MainWindow : Window
         Uri.TryCreate(value, UriKind.Absolute, out var uri)
         && (uri.Scheme == Uri.UriSchemeHttp || uri.Scheme == Uri.UriSchemeHttps);
 
+    private static bool ShouldProbeRemoteImage(string url)
+    {
+        if (!Uri.TryCreate(url, UriKind.Absolute, out var uri) || IsImageUrl(uri)) return false;
+        string extension = Path.GetExtension(uri.AbsolutePath).ToLowerInvariant();
+        string[] knownMediaExtensions =
+        {
+            ".mp4", ".m4v", ".mkv", ".webm", ".mov", ".avi", ".wmv", ".flv",
+            ".m3u8", ".mpd", ".ts", ".m4s", ".mp3", ".m4a", ".aac", ".ogg",
+            ".opus", ".wav", ".flac"
+        };
+        return !knownMediaExtensions.Contains(extension, StringComparer.OrdinalIgnoreCase);
+    }
+
     private static async Task<bool> IsRemoteImageAsync(string url)
     {
         try
         {
-            using var http = new HttpClient { Timeout = TimeSpan.FromSeconds(8) };
+            using var http = new HttpClient { Timeout = TimeSpan.FromSeconds(4) };
             http.DefaultRequestHeaders.UserAgent.ParseAdd("AboEzzat-TV/1.0");
             using var request = new HttpRequestMessage(HttpMethod.Head, url);
             using var response = await http.SendAsync(request, HttpCompletionOption.ResponseHeadersRead);
