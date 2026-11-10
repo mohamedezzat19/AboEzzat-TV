@@ -54,6 +54,8 @@ public partial class MainWindow : Window
 
     private sealed record HistoryEntry(string Title, string Url, DateTime PlayedAt);
     private readonly List<HistoryEntry> _history = new();
+    private int _historyNavigationIndex;
+    private bool _navigatingHistory;
     private string HistoryFile => Path.Combine(
         Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData),
         "AboEzzatTV", "playback-history.json");
@@ -160,6 +162,8 @@ public partial class MainWindow : Window
                 var root = json.RootElement;
                 if (root.TryGetProperty("url", out var u)) mediaUrl = u.GetString();
                 if (root.TryGetProperty("audio", out var a)) audioUrl = a.GetString();
+                if (root.TryGetProperty("command", out var jsonCommand))
+                    command = jsonCommand.GetString()?.Trim().ToLowerInvariant();
                 if (root.TryGetProperty("headers", out var h) && h.ValueKind == JsonValueKind.Object)
                 {
                     foreach (var header in h.EnumerateObject())
@@ -181,7 +185,7 @@ public partial class MainWindow : Window
                 var q = request.QueryString;
                 mediaUrl = q["url"] ?? q["video"];
                 audioUrl = q["audio"];
-                command = q["command"];
+                command = q["command"]?.Trim().ToLowerInvariant();
                 if (!string.IsNullOrWhiteSpace(q["images"]))
                     imageUrls.AddRange(q["images"].Split('|').Where(IsHttpUrl));
             }
@@ -189,8 +193,12 @@ public partial class MainWindow : Window
             bool valid = (string.IsNullOrWhiteSpace(mediaUrl) || IsHttpUrl(mediaUrl))
                 && (string.IsNullOrWhiteSpace(audioUrl) || IsHttpUrl(audioUrl));
             bool imagesValid = imageUrls.All(IsHttpUrl);
-            bool accepted = command is "ping" or "status" || valid && imagesValid
-                && (!string.IsNullOrWhiteSpace(mediaUrl) || !string.IsNullOrWhiteSpace(audioUrl) || imageUrls.Count > 0);
+            bool isStatusCommand = command is "ping" or "status";
+            bool isRemoteCommand = IsSupportedRemoteCommand(command);
+            bool hasCommand = !string.IsNullOrWhiteSpace(command);
+            bool accepted = isStatusCommand || isRemoteCommand
+                || (!hasCommand && valid && imagesValid
+                    && (!string.IsNullOrWhiteSpace(mediaUrl) || !string.IsNullOrWhiteSpace(audioUrl) || imageUrls.Count > 0));
 
             string responseText = accepted ? "OK" : "Invalid or unsupported request";
             string contentType = "text/plain; charset=utf-8";
@@ -210,6 +218,11 @@ public partial class MainWindow : Window
             ctx.Response.Close();
 
             if (command is "ping" or "status") return;
+            if (isRemoteCommand)
+            {
+                Dispatcher.Invoke(() => HandleRemoteCommand(command!));
+                return;
+            }
             if (accepted && !string.IsNullOrWhiteSpace(mediaUrl) && imageUrls.Count == 0
                 && ShouldProbeRemoteImage(mediaUrl) && await IsRemoteImageAsync(mediaUrl))
                 imageUrls.Add(mediaUrl);
@@ -245,6 +258,62 @@ public partial class MainWindow : Window
     private static bool IsHttpUrl(string? value) =>
         Uri.TryCreate(value, UriKind.Absolute, out var uri)
         && (uri.Scheme == Uri.UriSchemeHttp || uri.Scheme == Uri.UriSchemeHttps);
+
+    private static bool IsSupportedRemoteCommand(string? command) => command is
+        "stop" or "play_pause" or "rw" or "ff" or "previous" or "next"
+        or "volume_up" or "volume_down" or "mute";
+
+    private void HandleRemoteCommand(string command)
+    {
+        switch (command)
+        {
+            case "stop":
+                ShowHome();
+                break;
+            case "play_pause":
+                PlayPause_Click(this, new RoutedEventArgs());
+                break;
+            case "rw":
+                if (VideoPlayer.Source != null && VideoPlayer.Visibility == Visibility.Visible)
+                    Back10_Click(this, new RoutedEventArgs());
+                else if (AudioPlayer.HasSource)
+                    AudioPlayer.Seek(TimeSpan.FromSeconds(Math.Max(0, AudioPlayer.Position.TotalSeconds - 10)));
+                break;
+            case "ff":
+                if (VideoPlayer.Source != null && VideoPlayer.Visibility == Visibility.Visible)
+                    Forward10_Click(this, new RoutedEventArgs());
+                else if (AudioPlayer.HasSource)
+                    AudioPlayer.Seek(AudioPlayer.Position + TimeSpan.FromSeconds(10));
+                break;
+            case "previous":
+                if (_imagePlaylist.Count > 0) AdvanceImage(-1);
+                else NavigateHistory(1);
+                break;
+            case "next":
+                if (_imagePlaylist.Count > 0) AdvanceImage(1);
+                else NavigateHistory(-1);
+                break;
+            case "volume_up":
+                VolumeSlider.Value = Math.Min(1, VolumeSlider.Value + 0.05);
+                break;
+            case "volume_down":
+                VolumeSlider.Value = Math.Max(0, VolumeSlider.Value - 0.05);
+                break;
+            case "mute":
+                Mute_Click(this, new RoutedEventArgs());
+                break;
+        }
+    }
+
+    private void NavigateHistory(int direction)
+    {
+        if (_history.Count == 0) return;
+        int target = _historyNavigationIndex + direction;
+        if (target < 0 || target >= _history.Count) return;
+        _historyNavigationIndex = target;
+        _navigatingHistory = true;
+        ReceiveMedia(_history[target].Url, null);
+    }
 
     private static bool ShouldProbeRemoteImage(string url)
     {
@@ -323,10 +392,16 @@ public partial class MainWindow : Window
 
     private void AddHistory(string url)
     {
+        if (_navigatingHistory)
+        {
+            _navigatingHistory = false;
+            return;
+        }
         string title = GuessSubtitleTitle(new Uri(url));
         if (string.IsNullOrWhiteSpace(title)) title = url;
         _history.RemoveAll(x => string.Equals(x.Url, url, StringComparison.OrdinalIgnoreCase));
         _history.Insert(0, new HistoryEntry(title, url, DateTime.Now));
+        _historyNavigationIndex = 0;
         if (_history.Count > 50) _history.RemoveRange(50, _history.Count - 50);
         SaveHistory();
         RefreshHistoryList();
@@ -399,6 +474,7 @@ public partial class MainWindow : Window
         ReceivedImage.Visibility = Visibility.Collapsed;
         WelcomePanel.Visibility = Visibility.Collapsed;
         PlaySeparateAudio(uri, headers);
+        PlayPauseButton.Content = "إيقاف مؤقت";
     }
 
     private void StopAudioDeck()
@@ -683,21 +759,22 @@ public partial class MainWindow : Window
 
     private void PlayPause_Click(object sender, RoutedEventArgs e)
     {
-        if (VideoPlayer.Source == null) return;
+        bool videoActive = VideoPlayer.Source != null && VideoPlayer.Visibility == Visibility.Visible;
+        if (!videoActive && !AudioPlayer.HasSource) return;
         if (PlayPauseButton.Content?.ToString() == "تشغيل")
         {
-            VideoPlayer.Play();
+            if (videoActive) VideoPlayer.Play();
             if (AudioPlayer.HasSource) AudioPlayer.Resume();
             PlayPauseButton.Content = "إيقاف مؤقت";
-            ShowPlaybackControls();
+            if (videoActive) ShowPlaybackControls();
         }
         else
         {
-            VideoPlayer.Pause();
+            if (videoActive) VideoPlayer.Pause();
             if (AudioPlayer.HasSource) AudioPlayer.Pause();
             PlayPauseButton.Content = "تشغيل";
             _controlsHideTimer.Stop();
-            PlaybackControls.Visibility = Visibility.Visible;
+            if (videoActive) PlaybackControls.Visibility = Visibility.Visible;
         }
     }
 
