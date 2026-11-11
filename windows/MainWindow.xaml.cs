@@ -95,7 +95,9 @@ public partial class MainWindow : Window
         {
             _serverCts = new CancellationTokenSource();
             _listener = new HttpListener();
-            _listener.Prefixes.Add($"http://127.0.0.1:{ReceiverPort}/");
+            // Listen on all local interfaces so AboEzzat Cast on another device can connect.
+            // The installer reserves this HTTP.sys URL for standard Windows users.
+            _listener.Prefixes.Add($"http://+:{ReceiverPort}/");
             _listener.Start();
             _ = Task.Run(() => ListenLoopAsync(_serverCts.Token));
             _ = Task.Run(() => ProcessIncomingRequestsAsync(_serverCts.Token));
