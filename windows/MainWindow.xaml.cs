@@ -99,13 +99,17 @@ public partial class MainWindow : Window
             // The installer reserves this HTTP.sys URL for standard Windows users.
             _listener.Prefixes.Add($"http://+:{ReceiverPort}/");
             _listener.Start();
+            ReceiverStatusText.Text = "● الاستقبال يعمل — جاهز للاستقبال";
+            ReceiverStatusText.Foreground = new SolidColorBrush(Color.FromRgb(255, 222, 151));
             _ = Task.Run(() => ListenLoopAsync(_serverCts.Token));
             _ = Task.Run(() => ProcessIncomingRequestsAsync(_serverCts.Token));
             _ = Task.Run(() => DiscoveryLoopAsync(_serverCts.Token));
         }
         catch (Exception ex)
         {
-            MessageBox.Show($"تعذّر تشغيل منفذ {ReceiverPort}. قد يكون مستخدمًا أو يحتاج صلاحية.\n{ex.Message}",
+            ReceiverStatusText.Text = "● تعذّر تشغيل خدمة الاستقبال";
+            ReceiverStatusText.Foreground = Brushes.OrangeRed;
+            MessageBox.Show($"تعذّر تشغيل منفذ {ReceiverPort}. تأكد من تثبيت التطبيق عبر Setup.exe لحجز عنوان HTTP، وأن المنفذ غير مستخدم.\n{ex.Message}",
                 "AboEzzat Receiver", MessageBoxButton.OK, MessageBoxImage.Warning);
         }
     }
