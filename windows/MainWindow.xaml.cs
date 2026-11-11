@@ -96,7 +96,7 @@ public partial class MainWindow : Window
             _serverCts = new CancellationTokenSource();
             _listener = new HttpListener();
             // Listen on all local interfaces so AboEzzat Cast on another device can connect.
-            // The installer reserves this HTTP.sys URL for standard Windows users.
+            // This custom TcpListener binds directly to all local interfaces; HTTP.sys URLACL is not required.
             _listener.Prefixes.Add($"http://+:{ReceiverPort}/");
             _listener.Start();
             ReceiverStatusText.Text = "● الاستقبال يعمل — جاهز للاستقبال";
@@ -109,7 +109,7 @@ public partial class MainWindow : Window
         {
             ReceiverStatusText.Text = "● تعذّر تشغيل خدمة الاستقبال";
             ReceiverStatusText.Foreground = Brushes.OrangeRed;
-            MessageBox.Show($"تعذّر تشغيل منفذ {ReceiverPort}. تأكد من تثبيت التطبيق عبر Setup.exe لحجز عنوان HTTP، وأن المنفذ غير مستخدم.\n{ex.Message}",
+            MessageBox.Show($"تعذّر تشغيل منفذ {ReceiverPort}. تأكد أن المنفذ غير مستخدم وأن جدار حماية Windows يسمح بالاتصال على الشبكة الخاصة.\n{ex.Message}",
                 "AboEzzat Receiver", MessageBoxButton.OK, MessageBoxImage.Warning);
         }
     }
