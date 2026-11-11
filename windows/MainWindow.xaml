@@ -60,7 +60,7 @@
      <StackPanel Width="260">
       <TextBlock Text="ABO EZZAT • RECEIVER" Foreground="#FFCF5E" FontSize="11" FontWeight="Bold"/>
       <TextBlock Text="أهلاً بك يا أبو عزت" FontSize="20" FontWeight="Bold" Margin="0,5,0,0"/>
-      <TextBlock Text="● الاستقبال يعمل — جاهز للاستقبال" Foreground="#FFDE97" Margin="0,6,0,0"/>
+      <TextBlock x:Name="ReceiverStatusText" Text="● جاري تشغيل خدمة الاستقبال..." Foreground="#FFDE97" Margin="0,6,0,0"/>
       <TextBlock x:Name="IpText" Text="جاري تحديد عنوان IP..." Foreground="#55D6D0" FontSize="16" Margin="0,6,0,0" TextWrapping="Wrap"/>
       <TextBlock Text="منفذ الاستقبال: 8081" Foreground="#C6CBE0" Margin="0,3,0,0"/>
       <ListBox x:Name="HistoryList" Height="0" Visibility="Collapsed" SelectionChanged="HistoryList_SelectionChanged"/>
