@@ -63,7 +63,8 @@
       <TextBlock x:Name="ReceiverStatusText" Text="● جاري تشغيل خدمة الاستقبال..." Foreground="#FFDE97" Margin="0,6,0,0"/>
       <TextBlock x:Name="IpText" Text="جاري تحديد عنوان IP..." Foreground="#55D6D0" FontSize="16" Margin="0,6,0,0" TextWrapping="Wrap"/>
       <TextBlock Text="منفذ الاستقبال: 8081" Foreground="#C6CBE0" Margin="0,3,0,0"/>
-      <ListBox x:Name="HistoryList" Height="0" Visibility="Collapsed" SelectionChanged="HistoryList_SelectionChanged"/>
+      <Button x:Name="HistoryToggleButton" Content="سجل المشاهدة" Click="HistoryToggle_Click" Margin="0,12,0,6" Padding="10,7" Background="#26385F" Foreground="White" BorderThickness="0" HorizontalAlignment="Stretch"/>
+      <ListBox x:Name="HistoryList" Height="190" Visibility="Collapsed" SelectionChanged="HistoryList_SelectionChanged" Background="#101A35" Foreground="#E8E9F5" BorderBrush="#34466F" BorderThickness="1" ScrollViewer.VerticalScrollBarVisibility="Auto"/>
      </StackPanel>
     </Border>
     <Button x:Name="StopButton" Content="إيقاف التشغيل" Click="Stop_Click" Visibility="Collapsed"/>
