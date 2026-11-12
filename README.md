@@ -26,7 +26,7 @@ https://github.com/mohamedezzat19/AboEzzat-TV/actions/runs/42990983951
 - استقبال الصور وقائمة صور وعرض شرائح بفواصل زمنية.
 - سجل تشغيل ومواضع استكمال مشاهدة محفوظة محليًا.
 - زر بحث يدوي عن ترجمة عربية.
-- أوامر الريموت: `stop` و`play_pause` و`rw` و`ff` و`previous` و`next` و`volume_up` و`volume_down` و`mute`.
+- أوامر الريموت المطابقة لـ AboEzzat Cast: `stop` و`play_pause` و`rw` و`ff` و`prev` و`next` و`volume_up` و`volume_down` و`mute` (ويقبل المستقبل أيضًا الاسم البديل `previous`).
 
 هذه قدرات موجودة في الشيفرة وليست كلها مختبرة عمليًا بعد.
 
