@@ -441,6 +441,15 @@ public partial class MainWindow : Window
         HistoryList.ItemsSource = _history.Select(x => $"{x.Title}  •  {x.PlayedAt:MM/dd HH:mm}").ToList();
     }
 
+    private void HistoryToggle_Click(object sender, RoutedEventArgs e)
+    {
+        bool showHistory = HistoryList.Visibility != Visibility.Visible;
+        HistoryList.Visibility = showHistory ? Visibility.Visible : Visibility.Collapsed;
+        HistoryList.Height = showHistory ? 190 : 0;
+        HistoryToggleButton.Content = showHistory ? "إخفاء سجل المشاهدة" : "سجل المشاهدة";
+        if (showHistory) RefreshHistoryList();
+    }
+
     private void HistoryList_SelectionChanged(object sender, System.Windows.Controls.SelectionChangedEventArgs e)
     {
         int index = HistoryList.SelectedIndex;
