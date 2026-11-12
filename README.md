@@ -2,17 +2,19 @@
 
 الهدف هو نقل تجربة وإمكانيات **AboEzzat Receiver Android** إلى Windows، ثم بناء تطبيقات مستقلة لـ LG webOS وSamsung Tizen، مع إبقاء مستودعي Android Receiver وAboEzzat Cast الأصليين دون تعديل.
 
-## الحالة الحالية — 11 نوفمبر 2026
+## الحالة الحالية — 12 نوفمبر 2026
 
 يوجد فرع Windows النشط:
 `feature/libvlc-header-playback`
 
-تم إنشاء تطبيق Windows باستخدام **WPF و.NET 8 وLibVLC**. أحدث بناء مكتمل بنجاح هو تشغيل GitHub Actions رقم **42990983951** على commit `7f0b5031a9b9eb64b618b0b185f50c3275d11a52`:
+تم إنشاء تطبيق Windows باستخدام **WPF و.NET 8 وLibVLC**. أحدث بناء مكتمل بنجاح حتى الآن هو تشغيل GitHub Actions رقم **43037399899** على commit `175e9be20df3c3fcb06fe1b1e8d5e256a2e591e3`:
 
-https://github.com/mohamedezzat19/AboEzzat-TV/actions/runs/42990983951
+https://github.com/mohamedezzat19/AboEzzat-TV/actions/runs/43037399899
 
-نجحت خطوات Restore وPublish self-contained Windows x64 وإنشاء `AboEzzat-TV-Setup.exe` ورفع الـArtifact. حجم الـArtifact المضغوط المسجل في GitHub هو 130,993,011 بايت، وبصمة SHA-256 للـArtifact المضغوط:
-`66575bf082e8bcd06edd8d78a054dc4df01cf70fb36e2566b9bf7dc51d9070dd`.
+نجحت خطوات Restore وPublish self-contained Windows x64 وإنشاء `AboEzzat-TV-Setup.exe` ورفع الـArtifact. حجم الـArtifact المضغوط المسجل في GitHub هو 130,988,819 بايت، وبصمة SHA-256 للـArtifact المضغوط:
+`2c84a0c760dc4cd644e1887c4372cad59e809dda30efbf78faf2d91d84de07e6`.
+
+التعديلات الأحدث على سجل المشاهدة وأوامر الريموت لم تحصل بعد على بناء ناجح؛ التشغيل 45 أُعيدت محاولته، والتشغيل 46 في الانتظار.
 
 هذا يثبت نجاح التجميع والنشر وإنشاء المثبّت ورفعه فقط؛ لا يثبت تثبيت التطبيق وتشغيله على جهاز Windows فعلي أو نجاح استقبال وتشغيل وسائط مرسلة من AboEzzat Cast.
 
