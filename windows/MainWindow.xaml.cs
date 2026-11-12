@@ -266,7 +266,7 @@ public partial class MainWindow : Window
         && (uri.Scheme == Uri.UriSchemeHttp || uri.Scheme == Uri.UriSchemeHttps);
 
     private static bool IsSupportedRemoteCommand(string? command) => command is
-        "stop" or "play_pause" or "rw" or "ff" or "previous" or "next"
+        "stop" or "play_pause" or "rw" or "ff" or "prev" or "previous" or "next"
         or "volume_up" or "volume_down" or "mute";
 
     private void HandleRemoteCommand(string command)
@@ -291,7 +291,8 @@ public partial class MainWindow : Window
                 else if (AudioPlayer.HasSource)
                     AudioPlayer.Seek(AudioPlayer.Position + TimeSpan.FromSeconds(10));
                 break;
-            case "previous":
+            case "prev":
+            case "previous": // Keep the descriptive alias for older/custom senders.
                 if (_imagePlaylist.Count > 0) AdvanceImage(-1);
                 else NavigateHistory(1);
                 break;
