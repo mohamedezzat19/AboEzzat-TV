@@ -234,10 +234,6 @@ public partial class MainWindow : Window
                 Dispatcher.Invoke(() => HandleRemoteCommand(command!));
                 return;
             }
-            if (accepted && !string.IsNullOrWhiteSpace(mediaUrl) && imageUrls.Count == 0
-                && ShouldProbeRemoteImage(mediaUrl) && await IsRemoteImageAsync(mediaUrl))
-                imageUrls.Add(mediaUrl);
-
             if (accepted && (!string.IsNullOrWhiteSpace(mediaUrl)
                 || !string.IsNullOrWhiteSpace(audioUrl) || imageUrls.Count > 0))
             {
