@@ -29,6 +29,8 @@ public partial class MainWindow : Window
     private UdpClient? _discoveryClient;
     private bool _isFullscreen;
     private int _playRequestVersion;
+    private long _mediaRequestSequence;
+    private long _latestMediaRequestSequence;
     private WindowState _savedWindowState = WindowState.Maximized;
     private readonly DispatcherTimer _imageSlideshowTimer = new() { Interval = TimeSpan.FromSeconds(5) };
     private readonly List<Uri> _imagePlaylist = new();
@@ -226,6 +228,9 @@ public partial class MainWindow : Window
             if (command is "ping" or "status") return;
             if (isRemoteCommand)
             {
+                // Stop/history navigation must cancel any still-pending CDN image probe.
+                if (command is "stop" or "prev" or "previous" or "next")
+                    InvalidatePendingMediaRequests();
                 Dispatcher.Invoke(() => HandleRemoteCommand(command!));
                 return;
             }
@@ -239,11 +244,11 @@ public partial class MainWindow : Window
                 var video = mediaUrl;
                 var audio = audioUrl;
                 var images = imageUrls.ToArray();
-                Dispatcher.Invoke(() =>
-                {
-                    if (images.Length > 0) StartImagePlaylist(images);
-                    else ReceiveMedia(video, audio, mediaHeaders);
-                });
+                long requestSequence = Interlocked.Increment(ref _mediaRequestSequence);
+                Interlocked.Exchange(ref _latestMediaRequestSequence, requestSequence);
+                // Do optional CDN image detection away from the FIFO HTTP parser.
+                // A newer Cast request can now pass an older slow HEAD probe.
+                _ = DispatchIncomingMediaAsync(requestSequence, video, audio, images, mediaHeaders);
             }
         }
         catch (Exception ex)
@@ -264,6 +269,41 @@ public partial class MainWindow : Window
     private static bool IsHttpUrl(string? value) =>
         Uri.TryCreate(value, UriKind.Absolute, out var uri)
         && (uri.Scheme == Uri.UriSchemeHttp || uri.Scheme == Uri.UriSchemeHttps);
+
+    private void InvalidatePendingMediaRequests()
+    {
+        long sequence = Interlocked.Increment(ref _mediaRequestSequence);
+        Interlocked.Exchange(ref _latestMediaRequestSequence, sequence);
+    }
+
+    private async Task DispatchIncomingMediaAsync(
+        long requestSequence, string? video, string? audio, string[] images,
+        IReadOnlyDictionary<string, string> headers)
+    {
+        try
+        {
+            if (requestSequence != Interlocked.Read(ref _latestMediaRequestSequence)) return;
+
+            if (images.Length == 0 && !string.IsNullOrWhiteSpace(video)
+                && ShouldProbeRemoteImage(video) && await IsRemoteImageAsync(video))
+                images = new[] { video };
+
+            if (requestSequence != Interlocked.Read(ref _latestMediaRequestSequence)) return;
+
+            await Dispatcher.InvokeAsync(() =>
+            {
+                // Recheck on the UI thread: a newer request may have arrived
+                // after the network probe completed but before this callback ran.
+                if (requestSequence != Interlocked.Read(ref _latestMediaRequestSequence)) return;
+                if (images.Length > 0) StartImagePlaylist(images);
+                else ReceiveMedia(video, audio, headers);
+            });
+        }
+        catch (Exception ex)
+        {
+            System.Diagnostics.Debug.WriteLine($"Media dispatch {requestSequence} failed: {ex}");
+        }
+    }
 
     private static bool IsSupportedRemoteCommand(string? command) => command is
         "stop" or "play_pause" or "rw" or "ff" or "prev" or "previous" or "next"
@@ -319,6 +359,7 @@ public partial class MainWindow : Window
         if (target < 0 || target >= _history.Count) return;
         _historyNavigationIndex = target;
         _navigatingHistory = true;
+        InvalidatePendingMediaRequests();
         ReceiveMedia(_history[target].Url, null);
     }
 
@@ -458,7 +499,10 @@ public partial class MainWindow : Window
         string url = _history[index].Url;
         HistoryList.SelectedIndex = -1;
         if (Uri.TryCreate(url, UriKind.Absolute, out var uri) && IsHttpUrl(url))
+        {
+            InvalidatePendingMediaRequests();
             ReceiveMedia(url, null);
+        }
     }
 
     private void PlaySeparateAudio(Uri uri, IReadOnlyDictionary<string, string>? headers = null, TimeSpan startAt = default)
@@ -1151,6 +1195,7 @@ public partial class MainWindow : Window
 
     private void ShowHome()
     {
+        InvalidatePendingMediaRequests();
         ++_playRequestVersion;
         _pendingSeparateAudio = null;
         _pendingAudioHeaders = null;
