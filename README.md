@@ -20,7 +20,7 @@ https://github.com/mohamedezzat19/AboEzzat-TV/actions/runs/43395414174
 ## الموجود في كود Windows الحالي
 
 - واجهة WPF عربية بملء الشاشة مع عناصر تحكم للفيديو.
-- خادم TCP/HTTP مخصص يستمع على كل واجهات IPv4 المحلية على المنفذ 8081، ويستقبل `POST /play` وروابط query.
+- خادم `HttpListener` فوق Windows HTTP.sys يستمع على كل واجهات IPv4 المحلية على المنفذ 8081، ويستقبل `POST /play` وروابط query؛ يضيف المثبّت حجز URLACL اللازم للتشغيل دون صلاحيات Administrator.
 - قاعدة جدار حماية Windows للاتصالات الواردة على TCP 8081 ضمن ملف تعريف Private.
 - إعلان اكتشاف UDP multicast على `239.255.42.99:37020`.
 - استقبال رابط فيديو ورابط صوت منفصل وتشغيلهما عبر LibVLC.
