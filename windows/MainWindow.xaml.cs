@@ -97,8 +97,8 @@ public partial class MainWindow : Window
         {
             _serverCts = new CancellationTokenSource();
             _listener = new HttpListener();
-            // Listen on all local interfaces so AboEzzat Cast on another device can connect.
-            // This custom TcpListener binds directly to all local interfaces; HTTP.sys URLACL is not required.
+            // HttpListener uses Windows HTTP.sys. The installer reserves this prefix
+            // for standard Windows users so the receiver can run unelevated on the LAN.
             _listener.Prefixes.Add($"http://+:{ReceiverPort}/");
             _listener.Start();
             ReceiverStatusText.Text = "● الاستقبال يعمل — جاهز للاستقبال";
