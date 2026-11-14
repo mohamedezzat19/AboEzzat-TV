@@ -7,11 +7,11 @@
 يوجد فرع Windows النشط:
 `feature/libvlc-header-playback`
 
-تم إنشاء تطبيق Windows باستخدام **WPF و.NET 8 وLibVLC**. أحدث بناء مكتمل بنجاح حاليًا هو تشغيل GitHub Actions رقم **51** (Run ID: **43607906470**) على commit `94695b1a4e8e065912fd1a4aa27ed361715cff46`:
+تم إنشاء تطبيق Windows باستخدام **WPF و.NET 8 وLibVLC**. أحدث بناء مكتمل بنجاح حاليًا هو تشغيل GitHub Actions رقم **52** (Run ID: **43607986635**) على commit `d2a71fd58d23e34d7b0336a020cf9d5882cd3292`:
 
-https://github.com/mohamedezzat19/AboEzzat-TV/actions/runs/43607906470
+https://github.com/mohamedezzat19/AboEzzat-TV/actions/runs/43607986635
 
-نجحت جميع خطوات Restore وPublish self-contained Windows x64 وإنشاء `AboEzzat-TV-Setup.exe` ورفع Artifact باسم `AboEzzat-TV-Windows-Setup`. حجم Artifact المضغوط في GitHub هو 130,988,217 بايت. هذا البناء نجح بعد إزالة URLACL، لكنه سبق تصحيح الأسماء النهائية لأنواع المستمع. التشغيل رقم 52 يبني الآن commit الحالي `d2a71fd58d23e34d7b0336a020cf9d5882cd3292`.
+نجحت جميع خطوات Restore وPublish self-contained Windows x64 وإنشاء `AboEzzat-TV-Setup.exe` ورفع Artifact باسم `AboEzzat-TV-Windows-Setup`. حجم ملف Artifact المضغوط 130,986,190 بايت، وملف المثبّت داخله 131,499,692 بايت. بصمة SHA-256 للمثبّت: `785f9910f61a5f4515f06ff4b16599fad93c581e70d565fe4d03f15ab0d37521`. هذا البناء يتضمن إزالة URLACL غير الضروري وإعادة تسمية أنواع المستمع TCP بوضوح.
 
 
 يوجد تعديل أحدث على معالجة طلبات الوسائط في commit `701506fef91ddb701e410065de1633cfd7032571`: نقل فحص HEAD الاختياري لتحديد الصور البعيدة خارج مسار استقبال HTTP، بعد إرسال تأكيد الاستلام إلى Cast. كما تم الآن توحيد اسم المستمع إلى `TcpHttpListener` وإزالة أوامر URLACL غير اللازمة من المثبّت؛ ينتظر هذا التعديل نتيجة بناء GitHub Actions الجديد.
@@ -58,8 +58,8 @@ https://github.com/mohamedezzat19/AboEzzat-TV/actions/runs/43607906470
 
 ## التثبيت والاختبار المطلوبان
 
-1. آخر بناء مكتمل هو تشغيل GitHub Actions رقم 51. يحتوي Artifact على إزالة URLACL، لكن يُفضّل انتظار التشغيل 52 لاختبار أحدث مصدر.
-2. التشغيل 52 هو أول بناء للنسخة الحالية بعد توحيد أسماء `TcpHttpListener` و`TcpHttpListenerContext/Request/Response`؛ لا تعتبر Artifact رقم 51 اختبارًا لهذا التغيير الأخير.
+1. آخر بناء مكتمل هو تشغيل GitHub Actions رقم 52. نزّل Artifact باسم `AboEzzat-TV-Windows-Setup` من صفحة التشغيل.
+2. يتضمن Artifact رقم 52 توحيد أسماء `TcpHttpListener` و`TcpHttpListenerContext/Request/Response` وإزالة URLACL من المثبّت.
 3. فك ضغط الـArtifact وشغّل `AboEzzat-TV-Setup.exe` على Windows x64.
 4. وافق على قاعدة جدار الحماية للشبكة الخاصة، ولا تفتح المنفذ على الإنترنت العام.
 5. وصّل الكمبيوتر والهاتف على الشبكة المحلية نفسها.
