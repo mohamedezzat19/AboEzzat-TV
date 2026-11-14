@@ -7,15 +7,15 @@ using System.Text;
 namespace AboEzzatReceiver.Windows;
 
 // Small HTTP/1.1 receiver built directly on TcpListener.
-// It deliberately avoids HttpListener/HTTP.sys URLACL reservations.
-internal sealed class HttpListener : IDisposable
+// It deliberately avoids TcpHttpListener/HTTP.sys URLACL reservations.
+internal sealed class TcpHttpListener : IDisposable
 {
     private readonly List<string> _prefixes = new();
     private TcpListener? _tcp;
     public PrefixCollection Prefixes { get; }
     public bool IsListening { get; private set; }
 
-    public HttpListener() => Prefixes = new PrefixCollection(_prefixes);
+    public TcpHttpListener() => Prefixes = new PrefixCollection(_prefixes);
 
     public void Start()
     {
@@ -26,7 +26,7 @@ internal sealed class HttpListener : IDisposable
         IsListening = true;
     }
 
-    public async Task<HttpListenerContext> GetContextAsync()
+    public async Task<TcpTcpHttpListenerContext> GetContextAsync()
     {
         if (_tcp == null || !IsListening) throw new InvalidOperationException("Receiver is not listening.");
         var client = await _tcp.AcceptTcpClientAsync().ConfigureAwait(false);
@@ -74,9 +74,9 @@ internal sealed class HttpListener : IDisposable
 
             string host = headers.TryGetValue("Host", out var h) ? h : $"127.0.0.1:{((IPEndPoint)client.Client.LocalEndPoint!).Port}";
             var uri = new Uri(new Uri($"http://{host}"), requestLine[1]);
-            var request = new HttpListenerRequest(requestLine[0], uri, body,
+            var request = new TcpTcpHttpListenerRequest(requestLine[0], uri, body,
                 headers.TryGetValue("Content-Type", out var ct) ? ct : null);
-            return new HttpListenerContext(request, new HttpListenerResponse(client, stream));
+            return new TcpTcpHttpListenerContext(request, new TcpTcpHttpListenerResponse(client, stream));
         }
         catch
         {
@@ -102,15 +102,15 @@ internal sealed class HttpListener : IDisposable
     }
 }
 
-internal sealed class HttpListenerContext
+internal sealed class TcpTcpHttpListenerContext
 {
-    public HttpListenerRequest Request { get; }
-    public HttpListenerResponse Response { get; }
-    internal HttpListenerContext(HttpListenerRequest request, HttpListenerResponse response)
+    public TcpTcpHttpListenerRequest Request { get; }
+    public TcpTcpHttpListenerResponse Response { get; }
+    internal TcpTcpHttpListenerContext(TcpTcpHttpListenerRequest request, TcpTcpHttpListenerResponse response)
     { Request = request; Response = response; }
 }
 
-internal sealed class HttpListenerRequest
+internal sealed class TcpTcpHttpListenerRequest
 {
     public string HttpMethod { get; }
     public Uri Url { get; }
@@ -118,7 +118,7 @@ internal sealed class HttpListenerRequest
     public Encoding ContentEncoding { get; } = Encoding.UTF8;
     public NameValueCollection QueryString { get; } = new();
 
-    internal HttpListenerRequest(string method, Uri url, byte[] body, string? contentType)
+    internal TcpTcpHttpListenerRequest(string method, Uri url, byte[] body, string? contentType)
     {
         HttpMethod = method;
         Url = url;
@@ -136,7 +136,7 @@ internal sealed class HttpListenerRequest
         Uri.UnescapeDataString(value.Replace("+", " "));
 }
 
-internal sealed class HttpListenerResponse
+internal sealed class TcpTcpHttpListenerResponse
 {
     private readonly TcpClient _client;
     private readonly NetworkStream _network;
@@ -146,7 +146,7 @@ internal sealed class HttpListenerResponse
     public long ContentLength64 { get; set; } = -1;
     public Stream OutputStream { get; } = new MemoryStream();
 
-    internal HttpListenerResponse(TcpClient client, NetworkStream network)
+    internal TcpTcpHttpListenerResponse(TcpClient client, NetworkStream network)
     { _client = client; _network = network; }
 
     public void Close()
