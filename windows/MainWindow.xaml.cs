@@ -23,7 +23,7 @@ public partial class MainWindow : Window
     private TcpHttpListener? _listener;
     // Keep HTTP request handling FIFO: remote-image HEAD checks can complete out of order,
     // otherwise an older Cast URL could be dispatched after a newer one and replace it.
-    private readonly Channel<TcpTcpHttpListenerContext> _incomingRequests = Channel.CreateUnbounded<TcpTcpHttpListenerContext>(
+    private readonly Channel<TcpHttpListenerContext> _incomingRequests = Channel.CreateUnbounded<TcpHttpListenerContext>(
         new UnboundedChannelOptions { SingleReader = true, SingleWriter = true });
     private CancellationTokenSource? _serverCts;
     private UdpClient? _discoveryClient;
@@ -97,7 +97,7 @@ public partial class MainWindow : Window
         {
             _serverCts = new CancellationTokenSource();
             _listener = new TcpHttpListener();
-            // This project uses its own TcpListener-based HTTP server (TcpTcpHttpListener.cs).
+            // This project uses its own TcpListener-based HTTP server (TcpHttpListener.cs).
             // It binds directly to TCP 8081 and does not use Windows HTTP.sys or URLACL reservations.
             _listener.Prefixes.Add($"http://+:{ReceiverPort}/");
             _listener.Start();
@@ -120,7 +120,7 @@ public partial class MainWindow : Window
     {
         while (!token.IsCancellationRequested && _listener?.IsListening == true)
         {
-            TcpTcpHttpListenerContext ctx;
+            TcpHttpListenerContext ctx;
             try { ctx = await _listener.GetContextAsync(); }
             catch (Exception ex)
             {
@@ -153,7 +153,7 @@ public partial class MainWindow : Window
     // Compatible with Android Receiver's HTTP contract:
     // POST /play {"url":"...","audio":"...","headers":{...}}
     // GET /?url=... or /?video=...&audio=...; command=ping/status.
-    private async Task HandleHttpRequestAsync(TcpTcpHttpListenerContext ctx)
+    private async Task HandleHttpRequestAsync(TcpHttpListenerContext ctx)
     {
         string? mediaUrl = null, audioUrl = null, command = null;
         List<string> imageUrls = new();
