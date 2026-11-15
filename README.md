@@ -2,19 +2,18 @@
 
 الهدف هو نقل تجربة وإمكانيات **AboEzzat Receiver Android** إلى Windows، ثم بناء تطبيقات مستقلة لـ LG webOS وSamsung Tizen، مع إبقاء مستودعي Android Receiver وAboEzzat Cast الأصليين دون تعديل.
 
-## الحالة الحالية — 14 نوفمبر 2026
+## الحالة الحالية — 15 نوفمبر 2026
 
 يوجد فرع Windows النشط:
 `feature/libvlc-header-playback`
 
-تم إنشاء تطبيق Windows باستخدام **WPF و.NET 8 وLibVLC**. أحدث بناء مكتمل بنجاح حاليًا هو تشغيل GitHub Actions رقم **52** (Run ID: **43607986635**) على commit `d2a71fd58d23e34d7b0336a020cf9d5882cd3292`:
+تم إنشاء تطبيق Windows باستخدام **WPF و.NET 8 وLibVLC**. أحدث بناء مكتمل بنجاح هو تشغيل GitHub Actions رقم **53** (Run ID: **43693004824**) على commit `ba8ff30093e5385c9e9c3ba157052a24245810df`:
 
-https://github.com/mohamedezzat19/AboEzzat-TV/actions/runs/43607986635
+https://github.com/mohamedezzat19/AboEzzat-TV/actions/runs/43693004824
 
-نجحت جميع خطوات Restore وPublish self-contained Windows x64 وإنشاء `AboEzzat-TV-Setup.exe` ورفع Artifact باسم `AboEzzat-TV-Windows-Setup`. حجم ملف Artifact المضغوط 130,986,190 بايت، وملف المثبّت داخله 131,499,692 بايت. بصمة SHA-256 للمثبّت: `785f9910f61a5f4515f06ff4b16599fad93c581e70d565fe4d03f15ab0d37521`. هذا البناء يتضمن إزالة URLACL غير الضروري وإعادة تسمية أنواع المستمع TCP بوضوح.
+تحققت من نجاح جميع مراحل التشغيل: إعداد .NET 8، Restore، نشر نسخة Windows x64 مستقلة، تثبيت Inno Setup، إنشاء `AboEzzat-TV-Setup.exe`، ورفع Artifact باسم `AboEzzat-TV-Windows-Setup`. حجم الـArtifact المضغوط المسجل في GitHub هو 130,990,964 بايت. هذا يؤكد نجاح عملية البناء ورفع الملف فقط، ولا يثبت تشغيل المثبّت على جهاز Windows أو نجاح الاتصال مع AboEzzat Cast.
 
-
-يوجد تعديل أحدث على معالجة طلبات الوسائط في commit `701506fef91ddb701e410065de1633cfd7032571`: نقل فحص HEAD الاختياري لتحديد الصور البعيدة خارج مسار استقبال HTTP، بعد إرسال تأكيد الاستلام إلى Cast. كما تم الآن توحيد اسم المستمع إلى `TcpHttpListener` وإزالة أوامر URLACL غير اللازمة من المثبّت؛ ينتظر هذا التعديل نتيجة بناء GitHub Actions الجديد.
+آخر تعديل في commit `ba8ff30093e5385c9e9c3ba157052a24245810df` يحافظ على روابط صور CDN التي لا تحتوي على امتداد ملف داخل قوائم الصور: لم يعد `StartImagePlaylist` يستبعد روابط الصور لمجرد أن عنوانها لا ينتهي بـ `.jpg` أو امتداد معروف، مع الاحتفاظ بإزالة الروابط المكررة والتحقق من HTTP/HTTPS.
 
 ## الموجود في كود Windows الحالي
 
@@ -58,8 +57,8 @@ https://github.com/mohamedezzat19/AboEzzat-TV/actions/runs/43607986635
 
 ## التثبيت والاختبار المطلوبان
 
-1. آخر بناء مكتمل هو تشغيل GitHub Actions رقم 52. نزّل Artifact باسم `AboEzzat-TV-Windows-Setup` من صفحة التشغيل.
-2. يتضمن Artifact رقم 52 توحيد أسماء `TcpHttpListener` و`TcpHttpListenerContext/Request/Response` وإزالة URLACL من المثبّت.
+1. آخر بناء مكتمل هو تشغيل GitHub Actions رقم 53. نزّل Artifact باسم `AboEzzat-TV-Windows-Setup` من صفحة التشغيل 53.
+2. يتضمن Artifact رقم 53 إصلاح الاحتفاظ بروابط صور CDN التي لا تحمل امتدادًا واضحًا داخل قوائم الصور، بالإضافة إلى إصلاحات مستمع TCP وإعداد المثبّت السابقة.
 3. فك ضغط الـArtifact وشغّل `AboEzzat-TV-Setup.exe` على Windows x64.
 4. وافق على قاعدة جدار الحماية للشبكة الخاصة، ولا تفتح المنفذ على الإنترنت العام.
 5. وصّل الكمبيوتر والهاتف على الشبكة المحلية نفسها.
