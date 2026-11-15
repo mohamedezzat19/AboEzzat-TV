@@ -1080,7 +1080,9 @@ public partial class MainWindow : Window
     {
         _imageSlideshowTimer.Stop();
         _imagePlaylist.Clear();
-        _imagePlaylist.AddRange(urls.Where(IsHttpUrl).Select(x => new Uri(x)).Where(IsImageUrl));
+        _imagePlaylist.AddRange(urls.Where(IsHttpUrl)
+            .Distinct(StringComparer.OrdinalIgnoreCase)
+            .Select(x => new Uri(x)));
         if (_imagePlaylist.Count == 0) return;
 
         // Switching from video/audio to images must stop the previous media deck.
