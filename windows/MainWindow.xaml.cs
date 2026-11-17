@@ -1033,6 +1033,8 @@ public partial class MainWindow : Window
     {
         if (_isMediaExpanded) return;
         _isMediaExpanded = true;
+        HomeQuickActions.Visibility = Visibility.Collapsed;
+        FullscreenButton.Visibility = Visibility.Visible;
         InfoColumn.Width = new GridLength(0);
         GapColumn.Width = new GridLength(0);
         InfoPanel.Visibility = Visibility.Collapsed;
@@ -1057,6 +1059,8 @@ public partial class MainWindow : Window
     private void RestoreHomeLayout()
     {
         _isMediaExpanded = false;
+        HomeQuickActions.Visibility = Visibility.Visible;
+        FullscreenButton.Visibility = Visibility.Collapsed;
         if (_isFullscreen)
         {
             WindowStyle = _savedStyle;
@@ -1216,6 +1220,89 @@ public partial class MainWindow : Window
         ReceivedImage.Visibility = Visibility.Collapsed;
         UpdateImageControls();
         WelcomePanel.Visibility = Visibility.Visible;
+    }
+
+    private void Settings_Click(object sender, RoutedEventArgs e)
+    {
+        var dialog = new Window
+        {
+            Title = "إعدادات AboEzzat Receiver",
+            Width = 470,
+            Height = 300,
+            ResizeMode = ResizeMode.NoResize,
+            WindowStartupLocation = WindowStartupLocation.CenterOwner,
+            Owner = this,
+            Background = new SolidColorBrush(Color.FromRgb(8, 15, 43)),
+            Foreground = new SolidColorBrush(Color.FromRgb(232, 233, 245))
+        };
+
+        var panel = new StackPanel { Margin = new Thickness(22) };
+        panel.Children.Add(new TextBlock
+        {
+            Text = "حالة الاستقبال والشبكة",
+            FontSize = 22,
+            FontWeight = FontWeights.Bold,
+            Margin = new Thickness(0, 0, 0, 14)
+        });
+        panel.Children.Add(new TextBlock
+        {
+            Text = ReceiverStatusText.Text,
+            FontSize = 15,
+            Foreground = ReceiverStatusText.Foreground,
+            Margin = new Thickness(0, 0, 0, 10)
+        });
+        panel.Children.Add(new TextBlock
+        {
+            Text = "عنوان الريسيفر: " + IpText.Text,
+            FontSize = 16,
+            TextWrapping = TextWrapping.Wrap,
+            Margin = new Thickness(0, 0, 0, 6)
+        });
+        panel.Children.Add(new TextBlock
+        {
+            Text = "المنفذ: " + ReceiverPort,
+            FontSize = 15,
+            Foreground = new SolidColorBrush(Color.FromRgb(174, 185, 220)),
+            Margin = new Thickness(0, 0, 0, 18)
+        });
+
+        var buttons = new StackPanel
+        {
+            Orientation = Orientation.Horizontal,
+            HorizontalAlignment = HorizontalAlignment.Right
+        };
+        var copy = new Button { Content = "نسخ عنوان الاستقبال", Padding = new Thickness(12, 8, 12, 8), Margin = new Thickness(0, 0, 8, 0) };
+        copy.Click += (_, _) =>
+        {
+            Clipboard.SetText(IpText.Text);
+            copy.Content = "تم النسخ";
+        };
+        var network = new Button { Content = "إعدادات الشبكة", Padding = new Thickness(12, 8, 12, 8), Margin = new Thickness(0, 0, 8, 0) };
+        network.Click += (_, _) =>
+        {
+            try { System.Diagnostics.Process.Start(new System.Diagnostics.ProcessStartInfo("ms-settings:network") { UseShellExecute = true }); }
+            catch (Exception ex) { MessageBox.Show("تعذّر فتح إعدادات الشبكة: " + ex.Message, "إعدادات الريسيفر"); }
+        };
+        var close = new Button { Content = "إغلاق", Padding = new Thickness(18, 8, 18, 8), IsDefault = true, IsCancel = true };
+        buttons.Children.Add(copy);
+        buttons.Children.Add(network);
+        buttons.Children.Add(close);
+        panel.Children.Add(buttons);
+        dialog.Content = panel;
+        dialog.ShowDialog();
+    }
+
+    private void Browser_Click(object sender, RoutedEventArgs e)
+    {
+        try
+        {
+            System.Diagnostics.Process.Start(new System.Diagnostics.ProcessStartInfo("https://www.google.com") { UseShellExecute = true });
+        }
+        catch (Exception ex)
+        {
+            MessageBox.Show("تعذّر فتح المتصفح الافتراضي: " + ex.Message, "AboEzzat Receiver",
+                MessageBoxButton.OK, MessageBoxImage.Information);
+        }
     }
 
     private void Stop_Click(object sender, RoutedEventArgs e) => ShowHome();
