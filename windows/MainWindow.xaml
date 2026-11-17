@@ -52,8 +52,19 @@
       </ComboBox>
      </StackPanel>
     </Border>
-    <Button Content="⛶" Width="44" Height="40" HorizontalAlignment="Right" VerticalAlignment="Top" Margin="0,12,12,0"
-            Click="Fullscreen_Click" Background="#25345D" Foreground="White" BorderThickness="0" ToolTip="ملء الشاشة"/>
+    <StackPanel x:Name="HomeQuickActions" Orientation="Horizontal" HorizontalAlignment="Right"
+                VerticalAlignment="Top" Margin="12" Panel.ZIndex="30">
+     <Button Content="⚙" Width="48" Height="44" Margin="0,0,8,0" Click="Settings_Click"
+             Background="#25345D" Foreground="#FFCF5E" FontSize="22" BorderThickness="0"
+             ToolTip="إعدادات الريسيفر"/>
+     <Button Content="🌐" Width="48" Height="44" Click="Browser_Click"
+             Background="#25345D" Foreground="White" FontSize="21" BorderThickness="0"
+             ToolTip="فتح المتصفح الافتراضي"/>
+    </StackPanel>
+    <Button x:Name="FullscreenButton" Content="⛶" Width="44" Height="40"
+            HorizontalAlignment="Right" VerticalAlignment="Top" Margin="0,12,12,0"
+            Click="Fullscreen_Click" Background="#25345D" Foreground="White"
+            BorderThickness="0" ToolTip="ملء الشاشة" Visibility="Collapsed"/>
     <!-- Compact Android-Receiver-style connection card: shown only on the home screen. -->
     <Border x:Name="InfoPanel" HorizontalAlignment="Right" VerticalAlignment="Bottom" Margin="0,0,24,24"
             Background="#E8050C20" BorderBrush="#FFC54A" BorderThickness="1" CornerRadius="16" Padding="18,12">
