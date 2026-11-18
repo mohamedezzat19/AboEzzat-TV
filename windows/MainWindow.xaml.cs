@@ -1109,7 +1109,6 @@ public partial class MainWindow : Window
         if (_isMediaExpanded) return;
         _isMediaExpanded = true;
         HomeQuickActions.Visibility = Visibility.Collapsed;
-        HomeBrandIcon.Visibility = Visibility.Collapsed;
         FullscreenButton.Visibility = Visibility.Visible;
         InfoColumn.Width = new GridLength(0);
         GapColumn.Width = new GridLength(0);
@@ -1136,7 +1135,6 @@ public partial class MainWindow : Window
     {
         _isMediaExpanded = false;
         HomeQuickActions.Visibility = Visibility.Visible;
-        HomeBrandIcon.Visibility = Visibility.Visible;
         FullscreenButton.Visibility = Visibility.Collapsed;
         if (_isFullscreen)
         {
