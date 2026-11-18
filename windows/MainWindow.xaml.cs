@@ -71,13 +71,88 @@ public partial class MainWindow : Window
         LoadResumePositions();
         RefreshHistoryList();
         IpText.Text = $"{GetLocalIPv4()}:{ReceiverPort}";
-        Loaded += async (_, _) => await StartServerAsync();
+        Loaded += async (_, _) =>
+        {
+            await StartServerAsync();
+            _ = LoadWelcomeAssetsAsync();
+        };
         _subtitleTimer.Tick += (_, _) => UpdateSubtitleOverlay();
         _controlsTimer.Tick += (_, _) => UpdatePlaybackControls();
         _controlsHideTimer.Tick += (_, _) => HidePlaybackControlsIfNeeded();
         _resumeSaveTimer.Tick += (_, _) => SaveCurrentResumePosition();
         _imageSlideshowTimer.Tick += (_, _) => AdvanceImage(1);
         Closed += (_, _) => { SaveCurrentResumePosition(); SaveResumePositions(); StopServer(); StopAudioDeck(); AudioPlayer.Dispose(); VideoPlayer.Dispose(); };
+    }
+
+    private const string AndroidWelcomeBackgroundUrl =
+        "https://raw.githubusercontent.com/mohamedezzat19/AboEzzat-Receiver/main/app/src/main/res/drawable/welcome_background.png";
+    private const string AndroidAppIconUrl =
+        "https://raw.githubusercontent.com/mohamedezzat19/AboEzzat-Receiver/main/app/src/main/res/drawable/app_icon.png";
+
+    // Download the original Android artwork once, then keep a local cache so the
+    // Windows home screen still looks correct when the PC is offline.
+    private async Task LoadWelcomeAssetsAsync()
+    {
+        try
+        {
+            var backgroundTask = LoadCachedImageAsync(AndroidWelcomeBackgroundUrl, "welcome_background.png");
+            var iconTask = LoadCachedImageAsync(AndroidAppIconUrl, "app_icon.png");
+            await Task.WhenAll(backgroundTask, iconTask);
+
+            if (backgroundTask.Result is not null)
+                WelcomeBackgroundImage.Source = backgroundTask.Result;
+            if (iconTask.Result is not null)
+                HomeBrandIcon.Fill = new ImageBrush(iconTask.Result) { Stretch = Stretch.UniformToFill };
+        }
+        catch (Exception ex)
+        {
+            System.Diagnostics.Debug.WriteLine($"Welcome artwork load failed; using built-in fallback: {ex.Message}");
+        }
+    }
+
+    private static async Task<BitmapImage?> LoadCachedImageAsync(string url, string fileName)
+    {
+        string folder = Path.Combine(
+            Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData),
+            "AboEzzatTV", "assets");
+        Directory.CreateDirectory(folder);
+        string path = Path.Combine(folder, fileName);
+
+        if (File.Exists(path))
+        {
+            try { return DecodeBitmap(path); }
+            catch
+            {
+                try { File.Delete(path); } catch { }
+            }
+        }
+
+        try
+        {
+            using var http = new HttpClient { Timeout = TimeSpan.FromSeconds(8) };
+            http.DefaultRequestHeaders.UserAgent.ParseAdd("AboEzzat-TV/1.0");
+            byte[] bytes = await http.GetByteArrayAsync(url);
+            if (bytes.Length < 1024) return null;
+            await File.WriteAllBytesAsync(path, bytes);
+            return DecodeBitmap(path);
+        }
+        catch (Exception ex)
+        {
+            System.Diagnostics.Debug.WriteLine($"Could not cache artwork {fileName}: {ex.Message}");
+            return null;
+        }
+    }
+
+    private static BitmapImage DecodeBitmap(string path)
+    {
+        using var stream = File.OpenRead(path);
+        var bitmap = new BitmapImage();
+        bitmap.BeginInit();
+        bitmap.CacheOption = BitmapCacheOption.OnLoad;
+        bitmap.StreamSource = stream;
+        bitmap.EndInit();
+        bitmap.Freeze();
+        return bitmap;
     }
 
     private static string GetLocalIPv4()
@@ -1034,6 +1109,7 @@ public partial class MainWindow : Window
         if (_isMediaExpanded) return;
         _isMediaExpanded = true;
         HomeQuickActions.Visibility = Visibility.Collapsed;
+        HomeBrandIcon.Visibility = Visibility.Collapsed;
         FullscreenButton.Visibility = Visibility.Visible;
         InfoColumn.Width = new GridLength(0);
         GapColumn.Width = new GridLength(0);
@@ -1060,6 +1136,7 @@ public partial class MainWindow : Window
     {
         _isMediaExpanded = false;
         HomeQuickActions.Visibility = Visibility.Visible;
+        HomeBrandIcon.Visibility = Visibility.Visible;
         FullscreenButton.Visibility = Visibility.Collapsed;
         if (_isFullscreen)
         {
