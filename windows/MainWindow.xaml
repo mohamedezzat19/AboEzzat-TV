@@ -37,21 +37,19 @@
      </Border>
     </Grid>
     <Grid x:Name="WelcomePanel" HorizontalAlignment="Stretch" VerticalAlignment="Stretch" Background="#030C20">
-     <Image x:Name="WelcomeBackgroundImage" Stretch="Uniform" HorizontalAlignment="Center" VerticalAlignment="Center" IsHitTestVisible="False"/>
-     <Border Background="#33030C20" IsHitTestVisible="False"/>
-     <Border HorizontalAlignment="Center" VerticalAlignment="Center" Background="#AA07152F" BorderBrush="#55FFC54A" BorderThickness="1" CornerRadius="18" Padding="28,22">
-      <StackPanel>
-       <TextBlock Text="أبو عزت ريسيفر" FontSize="42" FontWeight="Bold" HorizontalAlignment="Center"/>
-       <TextBlock Text="جاهز لاستقبال الفيديوهات والصور من AboEzzat Cast" Margin="0,14,0,0" FontSize="18" Foreground="#AEB9DC" HorizontalAlignment="Center"/>
-      </StackPanel>
-     </Border>
+     <!-- Android uses FIT_CENTER: keep the original welcome artwork whole, anchored at the top. -->
+     <Image x:Name="WelcomeBackgroundImage" Stretch="Uniform" HorizontalAlignment="Stretch" VerticalAlignment="Top"
+            Margin="0,8,0,0" IsHitTestVisible="False"/>
     </Grid>
-    <Ellipse x:Name="HomeBrandIcon" Width="62" Height="62" HorizontalAlignment="Left" VerticalAlignment="Top" Margin="24"
-             Stroke="#FFC54A" StrokeThickness="2" Panel.ZIndex="40" IsHitTestVisible="False">
-     <Ellipse.Fill>
-      <ImageBrush ImageSource="pack://application:,,,/Assets/aboezzat-tv-icon.ico" Stretch="UniformToFill"/>
-     </Ellipse.Fill>
-    </Ellipse>
+    <Grid x:Name="HomeBrandIcon" Width="64" Height="64" HorizontalAlignment="Left" VerticalAlignment="Top"
+          Margin="14,12,0,0" Panel.ZIndex="40" IsHitTestVisible="False">
+     <Ellipse Fill="#071022" Stroke="#FFC54A" StrokeThickness="3"/>
+     <Ellipse Margin="5">
+      <Ellipse.Fill>
+       <ImageBrush ImageSource="pack://application:,,,/Assets/aboezzat-tv-icon.ico" Stretch="UniformToFill"/>
+      </Ellipse.Fill>
+     </Ellipse>
+    </Grid>
     <Border x:Name="ImageControls" HorizontalAlignment="Center" VerticalAlignment="Bottom" Margin="12,0,12,18" Padding="10,8" Background="#DD101A35" CornerRadius="12" Visibility="Collapsed">
      <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
       <Button Content="السابق" Click="ImagePrevious_Click" Margin="4,2" Padding="10,5" Background="#25345D" Foreground="White" BorderThickness="0"/>
