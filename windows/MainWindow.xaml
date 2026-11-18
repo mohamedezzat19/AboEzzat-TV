@@ -44,7 +44,7 @@
     <Grid x:Name="HomeBrandIcon" Width="64" Height="64" HorizontalAlignment="Left" VerticalAlignment="Top"
           Margin="14,12,0,0" Panel.ZIndex="40" IsHitTestVisible="False">
      <Ellipse Fill="#071022" Stroke="#FFC54A" StrokeThickness="3"/>
-     <Ellipse Margin="5">
+     <Ellipse x:Name="HomeBrandIconImage" Margin="5">
       <Ellipse.Fill>
        <ImageBrush ImageSource="pack://application:,,,/Assets/aboezzat-tv-icon.ico" Stretch="UniformToFill"/>
       </Ellipse.Fill>
