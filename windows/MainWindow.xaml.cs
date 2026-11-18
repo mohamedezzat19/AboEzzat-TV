@@ -102,7 +102,7 @@ public partial class MainWindow : Window
             if (backgroundTask.Result is not null)
                 WelcomeBackgroundImage.Source = backgroundTask.Result;
             if (iconTask.Result is not null)
-                HomeBrandIcon.Fill = new ImageBrush(iconTask.Result) { Stretch = Stretch.UniformToFill };
+                HomeBrandIconImage.Fill = new ImageBrush(iconTask.Result) { Stretch = Stretch.UniformToFill };
         }
         catch (Exception ex)
         {
