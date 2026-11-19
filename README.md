@@ -2,18 +2,18 @@
 
 الهدف هو نقل تجربة وإمكانيات **AboEzzat Receiver Android** إلى Windows، ثم بناء تطبيقات مستقلة لـ LG webOS وSamsung Tizen، مع إبقاء مستودعي Android Receiver وAboEzzat Cast الأصليين دون تعديل.
 
-## الحالة الحالية — 15 نوفمبر 2026
+## الحالة الحالية — 19 نوفمبر 2026
 
 يوجد فرع Windows النشط:
 `feature/libvlc-header-playback`
 
-تم إنشاء تطبيق Windows باستخدام **WPF و.NET 8 وLibVLC**. أحدث بناء مكتمل بنجاح هو تشغيل GitHub Actions رقم **53** (Run ID: **43693004824**) على commit `ba8ff30093e5385c9e9c3ba157052a24245810df`:
+تم إنشاء تطبيق Windows باستخدام **WPF و.NET 8 وLibVLC**. أحدث بناء مكتمل ومتحقق منه هو تشغيل GitHub Actions رقم **62** (Run ID: **44267993256**) على commit `47111e43d0d616251cde36e7bb9d0e9dbcbf0774`:
 
-https://github.com/mohamedezzat19/AboEzzat-TV/actions/runs/43693004824
+https://github.com/mohamedezzat19/AboEzzat-TV/actions/runs/44267993256
 
-تحققت من نجاح جميع مراحل التشغيل: إعداد .NET 8، Restore، نشر نسخة Windows x64 مستقلة، تثبيت Inno Setup، إنشاء `AboEzzat-TV-Setup.exe`، ورفع Artifact باسم `AboEzzat-TV-Windows-Setup`. حجم الـArtifact المضغوط المسجل في GitHub هو 130,990,964 بايت. هذا يؤكد نجاح عملية البناء ورفع الملف فقط، ولا يثبت تشغيل المثبّت على جهاز Windows أو نجاح الاتصال مع AboEzzat Cast.
+تحققت من نجاح جميع مراحل التشغيل: إعداد .NET 8، Restore، نشر نسخة Windows x64 مستقلة، تثبيت Inno Setup، إنشاء `AboEzzat-TV-Setup.exe`، ورفع Artifact باسم `AboEzzat-TV-Windows-Setup`. حجم الـArtifact المضغوط المسجل في GitHub هو 131,193,614 بايت. اسم الـArtifact هو `AboEzzat-TV-Windows-Setup`، وتاريخ رفعه 18 نوفمبر 2026. نجاح البناء ورفع الملف لا يثبت تثبيته أو نجاح الاتصال على جهاز Windows. هذا يؤكد نجاح عملية البناء ورفع الملف فقط، ولا يثبت تشغيل المثبّت على جهاز Windows أو نجاح الاتصال مع AboEzzat Cast.
 
-آخر تعديل في commit `ba8ff30093e5385c9e9c3ba157052a24245810df` يحافظ على روابط صور CDN التي لا تحتوي على امتداد ملف داخل قوائم الصور: لم يعد `StartImagePlaylist` يستبعد روابط الصور لمجرد أن عنوانها لا ينتهي بـ `.jpg` أو امتداد معروف، مع الاحتفاظ بإزالة الروابط المكررة والتحقق من HTTP/HTTPS.
+آخر تعديل في commit `47111e43d0d616251cde36e7bb9d0e9dbcbf0774` صحّح تطبيق صورة الأيقونة على عنصر `HomeBrandIconImage` الداخلي داخل الإطار الدائري. التعديل السابق `ba8ff30093e5385c9e9c3ba157052a24245810df` ما زال يحافظ على روابط صور CDN التي لا تحتوي على امتداد ملف داخل قوائم الصور، مع إزالة الروابط المكررة والتحقق من HTTP/HTTPS.
 
 ## الموجود في كود Windows الحالي
 
@@ -58,8 +58,8 @@ https://github.com/mohamedezzat19/AboEzzat-TV/actions/runs/43693004824
 
 ## التثبيت والاختبار المطلوبان
 
-1. آخر بناء مكتمل هو تشغيل GitHub Actions رقم 53. نزّل Artifact باسم `AboEzzat-TV-Windows-Setup` من صفحة التشغيل 53.
-2. يتضمن Artifact رقم 53 إصلاح الاحتفاظ بروابط صور CDN التي لا تحمل امتدادًا واضحًا داخل قوائم الصور، بالإضافة إلى إصلاحات مستمع TCP وإعداد المثبّت السابقة.
+1. آخر بناء مكتمل هو تشغيل GitHub Actions رقم 62. نزّل Artifact باسم `AboEzzat-TV-Windows-Setup` من صفحة التشغيل 62.
+2. يتضمن Artifact رقم 62 إصلاح صورة الأيقونة داخل الإطار الدائري، وإصلاح الاحتفاظ بروابط صور CDN التي لا تحمل امتدادًا واضحًا داخل قوائم الصور، بالإضافة إلى إصلاحات مستمع TCP وإعداد المثبّت السابقة.
 3. فك ضغط الـArtifact وشغّل `AboEzzat-TV-Setup.exe` على Windows x64.
 4. وافق على قاعدة جدار الحماية للشبكة الخاصة، ولا تفتح المنفذ على الإنترنت العام.
 5. وصّل الكمبيوتر والهاتف على الشبكة المحلية نفسها.
