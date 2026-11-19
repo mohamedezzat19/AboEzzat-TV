@@ -11,9 +11,9 @@
 
 https://github.com/mohamedezzat19/AboEzzat-TV/actions/runs/44267993256
 
-تحققت من نجاح جميع مراحل التشغيل: إعداد .NET 8، Restore، نشر نسخة Windows x64 مستقلة، تثبيت Inno Setup، إنشاء `AboEzzat-TV-Setup.exe`، ورفع Artifact باسم `AboEzzat-TV-Windows-Setup`. حجم الـArtifact المضغوط المسجل في GitHub هو 131,193,614 بايت. اسم الـArtifact هو `AboEzzat-TV-Windows-Setup`، وتاريخ رفعه 18 نوفمبر 2026. نجاح البناء ورفع الملف لا يثبت تثبيته أو نجاح الاتصال على جهاز Windows. هذا يؤكد نجاح عملية البناء ورفع الملف فقط، ولا يثبت تشغيل المثبّت على جهاز Windows أو نجاح الاتصال مع AboEzzat Cast.
+تحققت من نجاح جميع مراحل التشغيل: إعداد .NET 8، Restore، نشر نسخة Windows x64 مستقلة، تثبيت Inno Setup، إنشاء `AboEzzat-TV-Setup.exe`، ورفع Artifact باسم `AboEzzat-TV-Windows-Setup`. حجم الـArtifact المضغوط المسجل في GitHub هو 131,193,614 بايت. اسم الـArtifact هو `AboEzzat-TV-Windows-Setup`، وتاريخ رفعه 18 نوفمبر 2026. نجاح البناء ورفع الملف لا يثبت تثبيته أو نجاح الاتصال على جهاز Windows.
 
-آخر تعديل في commit `47111e43d0d616251cde36e7bb9d0e9dbcbf0774` صحّح تطبيق صورة الأيقونة على عنصر `HomeBrandIconImage` الداخلي داخل الإطار الدائري. التعديل السابق `ba8ff30093e5385c9e9c3ba157052a24245810df` ما زال يحافظ على روابط صور CDN التي لا تحتوي على امتداد ملف داخل قوائم الصور، مع إزالة الروابط المكررة والتحقق من HTTP/HTTPS.
+آخر تعديل برمجي في commit `47111e43d0d616251cde36e7bb9d0e9dbcbf0774` صحّح تطبيق صورة الأيقونة على عنصر `HomeBrandIconImage` الداخلي داخل الإطار الدائري. التعديل السابق `ba8ff30093e5385c9e9c3ba157052a24245810df` ما زال يحافظ على روابط صور CDN التي لا تحتوي على امتداد ملف داخل قوائم الصور، مع إزالة الروابط المكررة والتحقق من HTTP/HTTPS.
 
 ## الموجود في كود Windows الحالي
 
