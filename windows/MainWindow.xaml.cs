@@ -58,6 +58,7 @@ public partial class MainWindow : Window
     private readonly List<HistoryEntry> _history = new();
     private int _historyNavigationIndex;
     private bool _navigatingHistory;
+    private BrowserWindow? _browserWindow;
     private string HistoryFile => Path.Combine(
         Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData),
         "AboEzzatTV", "playback-history.json");
@@ -1369,15 +1370,15 @@ public partial class MainWindow : Window
 
     private void Browser_Click(object sender, RoutedEventArgs e)
     {
-        try
+        if (_browserWindow is { IsVisible: true })
         {
-            System.Diagnostics.Process.Start(new System.Diagnostics.ProcessStartInfo("https://www.google.com") { UseShellExecute = true });
+            _browserWindow.Activate();
+            return;
         }
-        catch (Exception ex)
-        {
-            MessageBox.Show("تعذّر فتح المتصفح الافتراضي: " + ex.Message, "AboEzzat Receiver",
-                MessageBoxButton.OK, MessageBoxImage.Information);
-        }
+
+        _browserWindow = new BrowserWindow { Owner = this };
+        _browserWindow.Closed += (_, _) => _browserWindow = null;
+        _browserWindow.Show();
     }
 
     private void Stop_Click(object sender, RoutedEventArgs e) => ShowHome();
