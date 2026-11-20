@@ -8,9 +8,9 @@ AppId={{B7D94B2D-8E43-4E58-9C0B-AB0E22A77101}
 AppName={#MyAppName}
 AppVersion={#MyAppVersion}
 AppPublisher={#MyAppPublisher}
-DefaultDirName={autopf}\\AboEzzat TV
+DefaultDirName={autopf}\AboEzzat TV
 DefaultGroupName={#MyAppName}
-UninstallDisplayIcon={app}\\{#MyAppExeName}
+UninstallDisplayIcon={app}\{#MyAppExeName}
 ArchitecturesAllowed=x64
 ArchitecturesInstallIn64BitMode=x64
 PrivilegesRequired=admin
@@ -28,18 +28,18 @@ Name: "english"; MessagesFile: "compiler:Default.isl"
 Name: "desktopicon"; Description: "Create a desktop shortcut"; GroupDescription: "Additional shortcuts:"; Flags: unchecked
 
 [Files]
-Source: "..\\windows\\publish\\win-x64\\*"; DestDir: "{app}"; Flags: ignoreversion recursesubdirs createallsubdirs
+Source: "..\windows\publish\win-x64\*"; DestDir: "{app}"; Flags: ignoreversion recursesubdirs createallsubdirs
 
 [Icons]
-Name: "{group}\\AboEzzat TV"; Filename: "{app}\\{#MyAppExeName}"
-Name: "{autodesktop}\\AboEzzat TV"; Filename: "{app}\\{#MyAppExeName}"; Tasks: desktopicon
+Name: "{group}\AboEzzat TV"; Filename: "{app}\{#MyAppExeName}"
+Name: "{autodesktop}\AboEzzat TV"; Filename: "{app}\{#MyAppExeName}"; Tasks: desktopicon
 
 [Run]
-Filename: "{sys}\\netsh.exe"; Parameters: "advfirewall firewall add rule name=""AboEzzat TV Receiver"" dir=in action=allow protocol=TCP localport=8081 profile=private"; Flags: runhidden waituntilterminated
-Filename: "{app}\\{#MyAppExeName}"; Description: "Launch AboEzzat TV"; Flags: postinstall nowait skipifsilent
+Filename: "{sys}\netsh.exe"; Parameters: "advfirewall firewall add rule name=""AboEzzat TV Receiver"" dir=in action=allow protocol=TCP localport=8081 profile=private"; Flags: runhidden waituntilterminated
+Filename: "{app}\{#MyAppExeName}"; Description: "Launch AboEzzat TV"; Flags: postinstall nowait skipifsilent
 
 [UninstallRun]
-Filename: "{sys}\\netsh.exe"; Parameters: "advfirewall firewall delete rule name=""AboEzzat TV Receiver"""; Flags: runhidden waituntilterminated
+Filename: "{sys}\netsh.exe"; Parameters: "advfirewall firewall delete rule name=""AboEzzat TV Receiver"""; Flags: runhidden waituntilterminated
 
 [Code]
 const
@@ -52,11 +52,11 @@ var
 begin
   Result :=
     (RegQueryStringValue(HKLM,
-      'SOFTWARE\\WOW6432Node\\Microsoft\\EdgeUpdate\\Clients\\' + WebView2ClientGuid,
+      'SOFTWARE\WOW6432Node\Microsoft\EdgeUpdate\Clients\' + WebView2ClientGuid,
       'pv', Version) and (Version <> '') and (Version <> '0.0.0.0'))
     or
     (RegQueryStringValue(HKCU,
-      'Software\\Microsoft\\EdgeUpdate\\Clients\\' + WebView2ClientGuid,
+      'Software\Microsoft\EdgeUpdate\Clients\' + WebView2ClientGuid,
       'pv', Version) and (Version <> '') and (Version <> '0.0.0.0'));
 end;
 
