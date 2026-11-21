@@ -318,6 +318,12 @@ public partial class MainWindow : Window
                 var images = imageUrls.ToArray();
                 long requestSequence = Interlocked.Increment(ref _mediaRequestSequence);
                 Interlocked.Exchange(ref _latestMediaRequestSequence, requestSequence);
+                if (!string.IsNullOrWhiteSpace(video) || images.Length > 0)
+                {
+                    // Invalidate any older async player handoff as soon as the newer
+                    // video/image request is accepted, before its UI dispatch or CDN probe.
+                    Interlocked.Increment(ref _playRequestVersion);
+                }
                 // Do optional CDN image detection away from the FIFO HTTP parser.
                 // A newer Cast request can now pass an older slow HEAD probe.
                 _ = DispatchIncomingMediaAsync(requestSequence, video, audio, images, mediaHeaders);
@@ -588,7 +594,7 @@ public partial class MainWindow : Window
 
     private void PlayAudioOnly(Uri uri, IReadOnlyDictionary<string, string>? headers = null)
     {
-        ++_playRequestVersion;
+        Interlocked.Increment(ref _playRequestVersion);
         SaveCurrentResumePosition();
         _resumeSaveTimer.Stop();
         _controlsTimer.Stop();
@@ -800,7 +806,7 @@ public partial class MainWindow : Window
 
     private async void PlayVideo(Uri uri, IReadOnlyDictionary<string, string>? headers = null, Uri? separateAudio = null)
     {
-        int requestVersion = ++_playRequestVersion;
+        int requestVersion = Interlocked.Increment(ref _playRequestVersion);
         StopAudioDeck();
         _pendingSeparateAudio = separateAudio;
         _pendingAudioHeaders = headers;
@@ -821,7 +827,7 @@ public partial class MainWindow : Window
         VideoPlayer.Visibility = Visibility.Visible;
         await Task.Delay(150);
         // A newer Cast request may have arrived while the old source was clearing.
-        if (requestVersion != _playRequestVersion
+        if (requestVersion != Volatile.Read(ref _playRequestVersion)
             || !string.Equals(_currentVideoUrl, uri.AbsoluteUri, StringComparison.OrdinalIgnoreCase))
             return;
         VideoPlayer.Source = uri;
@@ -1227,7 +1233,7 @@ public partial class MainWindow : Window
 
     private async void ShowImage(Uri uri)
     {
-        int imageRequestVersion = ++_playRequestVersion;
+        int imageRequestVersion = Interlocked.Increment(ref _playRequestVersion);
         SaveCurrentResumePosition();
         _resumeSaveTimer.Stop();
         _controlsTimer.Stop();
@@ -1252,7 +1258,7 @@ public partial class MainWindow : Window
             http.DefaultRequestHeaders.UserAgent.ParseAdd("AboEzzat-TV/1.0");
             http.DefaultRequestHeaders.Accept.ParseAdd("image/*");
             var bytes = await http.GetByteArrayAsync(uri);
-            if (imageRequestVersion != _playRequestVersion) return;
+            if (imageRequestVersion != Volatile.Read(ref _playRequestVersion) return;
             using var stream = new MemoryStream(bytes);
             var bitmap = new BitmapImage();
             bitmap.BeginInit();
@@ -1274,7 +1280,7 @@ public partial class MainWindow : Window
     private void ShowHome()
     {
         InvalidatePendingMediaRequests();
-        ++_playRequestVersion;
+        Interlocked.Increment(ref _playRequestVersion);
         _pendingSeparateAudio = null;
         _pendingAudioHeaders = null;
         SaveCurrentResumePosition();
