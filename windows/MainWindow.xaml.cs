@@ -1258,7 +1258,7 @@ public partial class MainWindow : Window
             http.DefaultRequestHeaders.UserAgent.ParseAdd("AboEzzat-TV/1.0");
             http.DefaultRequestHeaders.Accept.ParseAdd("image/*");
             var bytes = await http.GetByteArrayAsync(uri);
-            if (imageRequestVersion != Volatile.Read(ref _playRequestVersion) return;
+            if (imageRequestVersion != Volatile.Read(ref _playRequestVersion)) return;
             using var stream = new MemoryStream(bytes);
             var bitmap = new BitmapImage();
             bitmap.BeginInit();
@@ -1266,7 +1266,7 @@ public partial class MainWindow : Window
             bitmap.StreamSource = stream;
             bitmap.EndInit();
             bitmap.Freeze();
-            if (imageRequestVersion != _playRequestVersion) return;
+            if (imageRequestVersion != Volatile.Read(ref _playRequestVersion)) return;
             ReceivedImage.Source = bitmap;
             ReceivedImage.Visibility = Visibility.Visible;
         }
