@@ -7,13 +7,13 @@
 يوجد فرع Windows النشط:
 `feature/libvlc-header-playback`
 
-تم إنشاء تطبيق Windows باستخدام **WPF و.NET 8 وLibVLC**. أحدث بناء مكتمل ومتحقق منه هو تشغيل GitHub Actions رقم **65** (Run ID: **44758325004**) على commit `f5960b99cdc891523b95f3726ddf9fe533f053c3`:
+تم إنشاء تطبيق Windows باستخدام **WPF و.NET 8 وLibVLC**. أحدث بناء مكتمل ومتحقق منه هو تشغيل GitHub Actions رقم **67** (Run ID: **44885041707**) على commit `6b1e893ff735edc782650597629efacd3f53b8f4`:
 
-https://github.com/mohamedezzat19/AboEzzat-TV/actions/runs/44758325004
+https://github.com/mohamedezzat19/AboEzzat-TV/actions/runs/44885041707
 
-تحققت من نجاح جميع خطوات المهمة: إعداد .NET 8، Restore، نشر Windows x64 مستقل، تثبيت Inno Setup، إنشاء `AboEzzat-TV-Setup.exe`، ورفع Artifact باسم `AboEzzat-TV-Windows-Setup`. حجم الـArtifact المضغوط المسجل في GitHub هو 131,544,345 بايت، ورُفع في 20 نوفمبر 2026. نجاح البناء ورفع الملف لا يثبت تثبيته أو نجاح الاتصال على جهاز Windows.
+تحققت من نجاح جميع خطوات المهمة: إعداد .NET 8، Restore، نشر Windows x64 مستقل، تثبيت Inno Setup، إنشاء `AboEzzat-TV-Setup.exe`، ورفع Artifact باسم `AboEzzat-TV-Windows-Setup`. حجم الـArtifact المضغوط المسجل في GitHub هو 131,544,759 بايت، ورُفع في 21 نوفمبر 2026. نجاح البناء ورفع الملف لا يثبت تثبيته أو نجاح الاتصال على جهاز Windows.
 
-آخر تعديل في commit `f5960b99cdc891523b95f3726ddf9fe533f053c3` أصلح مسارات ملف المثبّت واكتشاف WebView2 Runtime. قبله أُضيف فحص وجود WebView2 Runtime في المثبّت، مع عرض رابط Microsoft الرسمي إذا لم يُكتشف. المتصفح الداخلي موجود في الكود، لكن تشغيله بعد التثبيت واختباره على جهاز Windows ما زالا مطلوبين.
+آخر تعديل في commit `6b1e893ff735edc782650597629efacd3f53b8f4` أصلح فحص إصدار طلب الصورة ذريًا باستخدام `Volatile.Read`، بعد إصلاح خطأ نحوي في التحقق من رقم الطلب. قبله أُضيف فحص وجود WebView2 Runtime في المثبّت، مع عرض رابط Microsoft الرسمي إذا لم يُكتشف. المتصفح الداخلي موجود في الكود، لكن تشغيله بعد التثبيت واختباره على جهاز Windows ما زالا مطلوبين.
 
 ## الموجود في كود Windows الحالي
 
@@ -60,8 +60,8 @@ https://github.com/mohamedezzat19/AboEzzat-TV/actions/runs/44758325004
 
 ## التثبيت والاختبار المطلوبان
 
-1. آخر بناء مكتمل هو تشغيل GitHub Actions رقم 65. نزّل Artifact باسم `AboEzzat-TV-Windows-Setup` من [صفحة التشغيل 65](https://github.com/mohamedezzat19/AboEzzat-TV/actions/runs/44758325004).
-2. يتضمن Artifact رقم 65 نافذة WebView2 الداخلية، وفحص WebView2 Runtime في المثبّت، وإصلاح مسارات ملف التثبيت. حجم الـArtifact المضغوط 131,544,345 بايت.
+1. آخر بناء مكتمل هو تشغيل GitHub Actions رقم 67. نزّل Artifact باسم `AboEzzat-TV-Windows-Setup` من [صفحة التشغيل 67](https://github.com/mohamedezzat19/AboEzzat-TV/actions/runs/44885041707).
+2. يتضمن Artifact رقم 67 نافذة WebView2 الداخلية، وفحص WebView2 Runtime في المثبّت، وإصلاح مسارات ملف التثبيت، وإصلاح فحص طلبات الصور. حجم الـArtifact المضغوط 131,544,759 بايت.
 3. فك ضغط الـArtifact وشغّل `AboEzzat-TV-Setup.exe` على Windows x64. إذا لم يكن WebView2 Runtime موجودًا، اتبع رابط Microsoft الرسمي الذي يعرضه المثبّت.
 4. وافق على قاعدة جدار الحماية للشبكة الخاصة، ولا تفتح المنفذ على الإنترنت العام.
 5. وصّل الكمبيوتر والهاتف على الشبكة المحلية نفسها.
