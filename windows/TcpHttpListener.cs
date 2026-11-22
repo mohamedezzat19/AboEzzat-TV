@@ -10,6 +10,9 @@ namespace AboEzzatReceiver.Windows;
 // It deliberately avoids System.Net.HttpListener and HTTP.sys URLACL reservations.
 internal sealed class TcpHttpListener : IDisposable
 {
+    // Bound the time spent parsing one accepted client so a stalled LAN peer
+    // cannot hold the single accept loop indefinitely.
+    private static readonly TimeSpan RequestReadTimeout = TimeSpan.FromSeconds(15);
     private readonly List<string> _prefixes = new();
     private TcpListener? _tcp;
     public PrefixCollection Prefixes { get; }
@@ -34,11 +37,13 @@ internal sealed class TcpHttpListener : IDisposable
         {
             client.NoDelay = true;
             var stream = client.GetStream();
+            using var requestTimeout = new CancellationTokenSource(RequestReadTimeout);
+            var requestToken = requestTimeout.Token;
             var headerBytes = new List<byte>(1024);
             var one = new byte[1];
             while (headerBytes.Count < 32768)
             {
-                int read = await stream.ReadAsync(one, 0, 1).ConfigureAwait(false);
+                int read = await stream.ReadAsync(one.AsMemory(0, 1), requestToken).ConfigureAwait(false);
                 if (read == 0) throw new IOException("Client closed before sending HTTP headers.");
                 headerBytes.Add(one[0]);
                 int n = headerBytes.Count;
@@ -67,7 +72,7 @@ internal sealed class TcpHttpListener : IDisposable
             int offset = 0;
             while (offset < body.Length)
             {
-                int read = await stream.ReadAsync(body, offset, body.Length - offset).ConfigureAwait(false);
+                int read = await stream.ReadAsync(body.AsMemory(offset, body.Length - offset), requestToken).ConfigureAwait(false);
                 if (read == 0) throw new EndOfStreamException("Incomplete HTTP request body.");
                 offset += read;
             }
