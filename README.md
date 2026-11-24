@@ -7,11 +7,11 @@
 يوجد فرع Windows النشط:
 `feature/libvlc-header-playback`
 
-تم إنشاء تطبيق Windows باستخدام **WPF و.NET 8 وLibVLC**. أحدث بناء مكتمل ومتحقق منه هو تشغيل GitHub Actions رقم **68** (Run ID: **45035352598**) على commit `557a4fc028000ee87c733f655fefca0f528738ac`:
+تم إنشاء تطبيق Windows باستخدام **WPF و.NET 8 وLibVLC**. أحدث بناء مكتمل ومتحقق منه هو تشغيل GitHub Actions رقم **69** (Run ID: **45359834984**) على commit `c8e45613fd8279da70d56110bcdd03b7e4db01a4`:
 
 https://github.com/mohamedezzat19/AboEzzat-TV/actions/runs/45035352598
 
-تحققت من نجاح جميع خطوات المهمة: إعداد .NET 8، Restore، نشر Windows x64 مستقل، تثبيت Inno Setup، إنشاء `AboEzzat-TV-Setup.exe`، ورفع Artifact باسم `AboEzzat-TV-Windows-Setup`. حجم الـArtifact المضغوط المسجل في GitHub هو 131,541,997 بايت، ورُفع في 22 نوفمبر 2026، وصلاحيته المسجلة حتى 20 فبراير 2027. نجاح البناء ورفع الملف لا يثبت تثبيته أو نجاح الاتصال على جهاز Windows.
+تحققت من نجاح جميع خطوات المهمة: إعداد .NET 8، Restore، نشر Windows x64 مستقل، تثبيت Inno Setup، إنشاء `AboEzzat-TV-Setup.exe`، ورفع Artifact باسم `AboEzzat-TV-Windows-Setup`. حجم الـArtifact المضغوط المسجل في GitHub هو 131,552,564 بايت، ورُفع في 24 نوفمبر 2026، وصلاحيته المسجلة حتى 22 فبراير 2027. نجاح البناء ورفع الملف لا يثبت تثبيته أو نجاح الاتصال على جهاز Windows.
 
 التعديل الحالي يفصل قبول TCP عن تحليل HTTP: حلقة القبول تسجل ترتيب كل اتصال وتضعه في طابور محدود سعته 32 عميلًا، بينما تعالج 8 مهام تحليل الطلبات بالتوازي. لكل عميل مهلة قراءة 15 ثانية وحد أقصى لجسم الطلب 1 MiB. يحمل كل طلب رقم ترتيب القبول الأصلي، ويستخدمه Windows لمنع طلب وسائط أقدم أو أمر إيقاف متأخر من تجاوز عملية أحدث حتى لو انتهى تحليل الاتصالات بترتيب مختلف. هذا يقلل أثر العميل الصامت على قبول الاتصالات، لكنه ما زال يحتاج اختبار ضغط وتكامل فعلي.
 
@@ -62,8 +62,8 @@ https://github.com/mohamedezzat19/AboEzzat-TV/actions/runs/45035352598
 
 ## التثبيت والاختبار المطلوبان
 
-1. أحدث بناء مكتمل هو تشغيل GitHub Actions رقم 68. نزّل Artifact باسم `AboEzzat-TV-Windows-Setup` من [صفحة التشغيل 68](https://github.com/mohamedezzat19/AboEzzat-TV/actions/runs/45035352598).
-2. يتضمن Artifact رقم 68 مهلة قراءة HTTP المحدودة، والمتصفح الداخلي WebView2، وفحص WebView2 Runtime في المثبّت، وإصلاحات طلبات الصور. حجم الـArtifact المضغوط 131,541,997 بايت.
+1. أحدث بناء مكتمل هو تشغيل GitHub Actions رقم 69. نزّل Artifact باسم `AboEzzat-TV-Windows-Setup` من [صفحة التشغيل 69](https://github.com/mohamedezzat19/AboEzzat-TV/actions/runs/45359834984).
+2. يتضمن Artifact رقم 69 قبول TCP المستقل وتحليل HTTP المتوازي المحدود، وترتيب قبول الطلبات لمنع الطلبات الأقدم من تجاوز الأحدث، إضافة إلى المتصفح الداخلي WebView2 وفحص WebView2 Runtime في المثبّت. حجم الـArtifact المضغوط 131,552,564 بايت.
 3. فك ضغط الـArtifact وشغّل `AboEzzat-TV-Setup.exe` على Windows x64. إذا لم يكن WebView2 Runtime موجودًا، اتبع رابط Microsoft الرسمي الذي يعرضه المثبّت.
 4. وافق على قاعدة جدار الحماية للشبكة الخاصة، ولا تفتح المنفذ على الإنترنت العام.
 5. وصّل الكمبيوتر والهاتف على الشبكة المحلية نفسها.
