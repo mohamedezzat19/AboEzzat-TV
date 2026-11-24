@@ -21,8 +21,8 @@ public partial class MainWindow : Window
     private const string DiscoveryGroup = "239.255.42.99";
     private readonly VlcAudioPlayback AudioPlayer;
     private TcpHttpListener? _listener;
-    // Keep HTTP request handling FIFO: remote-image HEAD checks can complete out of order,
-    // otherwise an older Cast URL could be dispatched after a newer one and replace it.
+    // TcpHttpListener parses accepted sockets concurrently. Parsed requests are serialized
+    // here, and each context carries its original accept sequence to reject stale operations.
     private readonly Channel<TcpHttpListenerContext> _incomingRequests = Channel.CreateUnbounded<TcpHttpListenerContext>(
         new UnboundedChannelOptions { SingleReader = true, SingleWriter = true });
     private CancellationTokenSource? _serverCts;
@@ -31,6 +31,8 @@ public partial class MainWindow : Window
     private int _playRequestVersion;
     private long _mediaRequestSequence;
     private long _latestMediaRequestSequence;
+    private readonly object _mediaOperationSync = new();
+    private long _latestMediaOperationAcceptSequence;
     private WindowState _savedWindowState = WindowState.Maximized;
     private readonly DispatcherTimer _imageSlideshowTimer = new() { Interval = TimeSpan.FromSeconds(5) };
     private readonly List<Uri> _imagePlaylist = new();
@@ -218,8 +220,8 @@ public partial class MainWindow : Window
     {
         try
         {
-            // Process in socket-accept order. A delayed image-detection request must not
-            // let an older video overwrite a more recent Cast send.
+            // Parsing may finish out of order. Handle each completed request serially;
+            // AcceptSequence keeps media and stop/history operations in original socket order.
             await foreach (var ctx in _incomingRequests.Reader.ReadAllAsync(token))
                 await HandleHttpRequestAsync(ctx);
         }
@@ -304,10 +306,22 @@ public partial class MainWindow : Window
             if (command is "ping" or "status") return;
             if (isRemoteCommand)
             {
-                // Stop/history navigation must cancel any still-pending CDN image probe.
+                long? acceptedOperationSequence = null;
+                // These commands replace or cancel the current media operation. Ignore
+                // a delayed parse if a newer media/stop operation was accepted meanwhile.
                 if (command is "stop" or "prev" or "previous" or "next")
-                    InvalidatePendingMediaRequests();
-                Dispatcher.Invoke(() => HandleRemoteCommand(command!));
+                {
+                    if (!TryBeginIncomingInvalidatingCommand(ctx.AcceptSequence)) return;
+                    acceptedOperationSequence = ctx.AcceptSequence;
+                }
+
+                Dispatcher.Invoke(() =>
+                {
+                    if (acceptedOperationSequence.HasValue
+                        && !IsCurrentMediaOperation(acceptedOperationSequence.Value))
+                        return;
+                    HandleRemoteCommand(command!, acceptedOperationSequence);
+                });
                 return;
             }
             if (accepted && (!string.IsNullOrWhiteSpace(mediaUrl)
@@ -316,8 +330,8 @@ public partial class MainWindow : Window
                 var video = mediaUrl;
                 var audio = audioUrl;
                 var images = imageUrls.ToArray();
-                long requestSequence = Interlocked.Increment(ref _mediaRequestSequence);
-                Interlocked.Exchange(ref _latestMediaRequestSequence, requestSequence);
+                if (!TryBeginIncomingMediaRequest(ctx.AcceptSequence, out long requestSequence))
+                    return;
                 if (!string.IsNullOrWhiteSpace(video) || images.Length > 0)
                 {
                     // Invalidate any older async player handoff as soon as the newer
@@ -348,10 +362,56 @@ public partial class MainWindow : Window
         Uri.TryCreate(value, UriKind.Absolute, out var uri)
         && (uri.Scheme == Uri.UriSchemeHttp || uri.Scheme == Uri.UriSchemeHttps);
 
+    private bool TryBeginIncomingMediaRequest(long acceptedSequence, out long requestSequence)
+    {
+        lock (_mediaOperationSync)
+        {
+            if (acceptedSequence <= _latestMediaOperationAcceptSequence)
+            {
+                requestSequence = 0;
+                return false;
+            }
+
+            _latestMediaOperationAcceptSequence = acceptedSequence;
+            requestSequence = Interlocked.Increment(ref _mediaRequestSequence);
+            Interlocked.Exchange(ref _latestMediaRequestSequence, requestSequence);
+            return true;
+        }
+    }
+
+    private bool TryBeginIncomingInvalidatingCommand(long acceptedSequence)
+    {
+        lock (_mediaOperationSync)
+        {
+            if (acceptedSequence <= _latestMediaOperationAcceptSequence)
+                return false;
+
+            _latestMediaOperationAcceptSequence = acceptedSequence;
+            long sequence = Interlocked.Increment(ref _mediaRequestSequence);
+            Interlocked.Exchange(ref _latestMediaRequestSequence, sequence);
+            return true;
+        }
+    }
+
+    private bool IsCurrentMediaOperation(long acceptedSequence)
+    {
+        lock (_mediaOperationSync)
+            return _latestMediaOperationAcceptSequence == acceptedSequence;
+    }
+
     private void InvalidatePendingMediaRequests()
     {
-        long sequence = Interlocked.Increment(ref _mediaRequestSequence);
-        Interlocked.Exchange(ref _latestMediaRequestSequence, sequence);
+        lock (_mediaOperationSync)
+        {
+            // A local Stop/Home action cancels every request accepted before the click,
+            // while requests accepted afterward remain eligible to play.
+            long acceptedSequence = _listener?.LastAcceptedSequence ?? 0;
+            if (acceptedSequence > _latestMediaOperationAcceptSequence)
+                _latestMediaOperationAcceptSequence = acceptedSequence;
+
+            long sequence = Interlocked.Increment(ref _mediaRequestSequence);
+            Interlocked.Exchange(ref _latestMediaRequestSequence, sequence);
+        }
     }
 
     private async Task DispatchIncomingMediaAsync(
@@ -387,12 +447,12 @@ public partial class MainWindow : Window
         "stop" or "play_pause" or "rw" or "ff" or "prev" or "previous" or "next"
         or "volume_up" or "volume_down" or "mute";
 
-    private void HandleRemoteCommand(string command)
+    private void HandleRemoteCommand(string command, long? acceptedOperationSequence = null)
     {
         switch (command)
         {
             case "stop":
-                ShowHome();
+                ShowHome(acceptedOperationSequence);
                 break;
             case "play_pause":
                 PlayPause_Click(this, new RoutedEventArgs());
@@ -412,11 +472,11 @@ public partial class MainWindow : Window
             case "prev":
             case "previous": // Keep the descriptive alias for older/custom senders.
                 if (_imagePlaylist.Count > 0) AdvanceImage(-1);
-                else NavigateHistory(1);
+                else NavigateHistory(1, acceptedOperationSequence);
                 break;
             case "next":
                 if (_imagePlaylist.Count > 0) AdvanceImage(1);
-                else NavigateHistory(-1);
+                else NavigateHistory(-1, acceptedOperationSequence);
                 break;
             case "volume_up":
                 VolumeSlider.Value = Math.Min(1, VolumeSlider.Value + 0.05);
@@ -430,14 +490,15 @@ public partial class MainWindow : Window
         }
     }
 
-    private void NavigateHistory(int direction)
+    private void NavigateHistory(int direction, long? acceptedOperationSequence = null)
     {
         if (_history.Count == 0) return;
         int target = _historyNavigationIndex + direction;
         if (target < 0 || target >= _history.Count) return;
         _historyNavigationIndex = target;
         _navigatingHistory = true;
-        InvalidatePendingMediaRequests();
+        if (!acceptedOperationSequence.HasValue)
+            InvalidatePendingMediaRequests();
         ReceiveMedia(_history[target].Url, null);
     }
 
@@ -1273,13 +1334,15 @@ public partial class MainWindow : Window
         catch (Exception ex)
         {
             System.Diagnostics.Debug.WriteLine($"Image load failed ({uri}): {ex}");
-            ShowHome();
+            if (imageRequestVersion == Volatile.Read(ref _playRequestVersion))
+                ShowHome();
         }
     }
 
-    private void ShowHome()
+    private void ShowHome(long? acceptedOperationSequence = null)
     {
-        InvalidatePendingMediaRequests();
+        if (!acceptedOperationSequence.HasValue)
+            InvalidatePendingMediaRequests();
         Interlocked.Increment(ref _playRequestVersion);
         _pendingSeparateAudio = null;
         _pendingAudioHeaders = null;
