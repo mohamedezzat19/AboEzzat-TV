@@ -23,8 +23,15 @@ public partial class MainWindow : Window
     private TcpHttpListener? _listener;
     // TcpHttpListener parses accepted sockets concurrently. Parsed requests are serialized
     // here, and each context carries its original accept sequence to reject stale operations.
-    private readonly Channel<TcpHttpListenerContext> _incomingRequests = Channel.CreateUnbounded<TcpHttpListenerContext>(
-        new UnboundedChannelOptions { SingleReader = true, SingleWriter = true });
+    private const int IncomingRequestQueueCapacity = 32;
+    private readonly Channel<TcpHttpListenerContext> _incomingRequests = Channel.CreateBounded<TcpHttpListenerContext>(
+        new BoundedChannelOptions(IncomingRequestQueueCapacity)
+        {
+            FullMode = BoundedChannelFullMode.Wait,
+            SingleReader = true,
+            SingleWriter = true,
+            AllowSynchronousContinuations = false
+        });
     private CancellationTokenSource? _serverCts;
     private UdpClient? _discoveryClient;
     private bool _isFullscreen;
@@ -220,9 +227,21 @@ public partial class MainWindow : Window
                 continue;
             }
 
-            if (!_incomingRequests.Writer.TryWrite(ctx))
+            try
+            {
+                // Apply backpressure instead of allowing parsed HTTP contexts to grow
+                // without bound while the serialized request handler is busy.
+                await _incomingRequests.Writer.WriteAsync(ctx, token);
+            }
+            catch (OperationCanceledException) when (token.IsCancellationRequested)
             {
                 try { ctx.Response.Close(); } catch { }
+                break;
+            }
+            catch (ChannelClosedException)
+            {
+                try { ctx.Response.Close(); } catch { }
+                break;
             }
         }
         _incomingRequests.Writer.TryComplete();
@@ -238,6 +257,14 @@ public partial class MainWindow : Window
                 await HandleHttpRequestAsync(ctx);
         }
         catch (OperationCanceledException) when (token.IsCancellationRequested) { }
+        finally
+        {
+            // Requests still buffered during shutdown must release their sockets.
+            while (_incomingRequests.Reader.TryRead(out var pending))
+            {
+                try { pending.Response.Close(); } catch { }
+            }
+        }
     }
 
     // Compatible with Android Receiver's HTTP contract:
