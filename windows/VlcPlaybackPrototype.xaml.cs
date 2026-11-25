@@ -4,6 +4,7 @@ using System.Collections.Generic;
 using System.Windows;
 using System.Windows.Controls;
 using System.Windows.Threading;
+using System.Threading;
 
 namespace AboEzzatReceiver.Windows;
 
@@ -17,7 +18,8 @@ public partial class VlcPlaybackPrototype : UserControl, IDisposable
     private readonly MediaPlayer _mediaPlayer;
     private Media? _currentMedia;
     private Uri? _source;
-    private bool _openedRaised;
+    private long _sourceGeneration;
+    private long _openedGeneration = -1;
     private double _volume = 0.8;
     private bool _isMuted;
 
@@ -32,8 +34,15 @@ public partial class VlcPlaybackPrototype : UserControl, IDisposable
         _mediaPlayer = new MediaPlayer(_libVlc);
         VlcView.MediaPlayer = _mediaPlayer;
         _mediaPlayer.Playing += (_, _) => OnMediaPlaying();
-        _mediaPlayer.EndReached += (_, _) => Dispatcher.BeginInvoke(new Action(() =>
-            MediaEnded?.Invoke(this, new RoutedEventArgs())));
+        _mediaPlayer.EndReached += (_, _) =>
+        {
+            long generation = Interlocked.Read(ref _sourceGeneration);
+            Dispatcher.BeginInvoke(new Action(() =>
+            {
+                if (generation != Interlocked.Read(ref _sourceGeneration)) return;
+                MediaEnded?.Invoke(this, new RoutedEventArgs());
+            }));
+        };
         Unloaded += (_, _) => Stop();
     }
 
@@ -54,7 +63,6 @@ public partial class VlcPlaybackPrototype : UserControl, IDisposable
 
             Stop();
             _source = value;
-            _openedRaised = false;
             _currentMedia = new Media(_libVlc, value);
             ApplyRequestHeaders(_currentMedia, RequestHeaders);
         }
@@ -129,6 +137,7 @@ public partial class VlcPlaybackPrototype : UserControl, IDisposable
 
     public void Stop()
     {
+        Interlocked.Increment(ref _sourceGeneration);
         _mediaPlayer.Stop();
         _currentMedia?.Dispose();
         _currentMedia = null;
@@ -136,9 +145,13 @@ public partial class VlcPlaybackPrototype : UserControl, IDisposable
 
     private void OnMediaPlaying()
     {
-        if (_openedRaised) return;
-        _openedRaised = true;
-        Dispatcher.BeginInvoke(new Action(() => MediaOpened?.Invoke(this, new RoutedEventArgs())));
+        long generation = Interlocked.Read(ref _sourceGeneration);
+        if (Interlocked.Exchange(ref _openedGeneration, generation) == generation) return;
+        Dispatcher.BeginInvoke(new Action(() =>
+        {
+            if (generation != Interlocked.Read(ref _sourceGeneration)) return;
+            MediaOpened?.Invoke(this, new RoutedEventArgs());
+        }));
     }
 
     private static void ApplyRequestHeaders(Media media, IReadOnlyDictionary<string, string>? headers)

@@ -33,6 +33,18 @@ public partial class MainWindow : Window
     private long _latestMediaRequestSequence;
     private readonly object _mediaOperationSync = new();
     private long _latestMediaOperationAcceptSequence;
+    private sealed record IncomingQueueItem(long AcceptSequence, string VideoUrl, string? AudioUrl,
+        IReadOnlyDictionary<string, string> Headers);
+    private sealed record PendingIncomingQueueItem(long AcceptSequence, string VideoUrl);
+    private const int MaxIncomingQueueItems = 100;
+    private readonly List<IncomingQueueItem> _incomingQueue = new();
+    private readonly List<PendingIncomingQueueItem> _pendingIncomingQueue = new();
+    private int _incomingQueueIndex = -1;
+    private int _incomingQueueItemCount;
+    private long _incomingQueueSessionStartSequence;
+    private long _incomingQueueSessionInvalidationSequence;
+    private bool _incomingQueueSessionActive;
+    private bool _hasProcessedMediaOperation;
     private WindowState _savedWindowState = WindowState.Maximized;
     private readonly DispatcherTimer _imageSlideshowTimer = new() { Interval = TimeSpan.FromSeconds(5) };
     private readonly List<Uri> _imagePlaylist = new();
@@ -233,7 +245,7 @@ public partial class MainWindow : Window
     // GET /?url=... or /?video=...&audio=...; command=ping/status.
     private async Task HandleHttpRequestAsync(TcpHttpListenerContext ctx)
     {
-        string? mediaUrl = null, audioUrl = null, command = null;
+        string? mediaUrl = null, audioUrl = null, command = null, queuedMediaUrl = null;
         List<string> imageUrls = new();
         var mediaHeaders = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
         try
@@ -269,6 +281,7 @@ public partial class MainWindow : Window
             else
             {
                 var q = request.QueryString;
+                queuedMediaUrl = q["queue"];
                 mediaUrl = q["url"] ?? q["video"];
                 audioUrl = q["audio"];
                 command = q["command"]?.Trim().ToLowerInvariant();
@@ -282,8 +295,15 @@ public partial class MainWindow : Window
             bool isStatusCommand = command is "ping" or "status";
             bool isRemoteCommand = IsSupportedRemoteCommand(command);
             bool hasCommand = !string.IsNullOrWhiteSpace(command);
-            bool accepted = isStatusCommand || isRemoteCommand
-                || (!hasCommand && valid && imagesValid
+            bool isQueueRequest = !string.IsNullOrWhiteSpace(queuedMediaUrl);
+            bool queueValid = !isQueueRequest || (IsHttpUrl(queuedMediaUrl)
+                && Uri.TryCreate(queuedMediaUrl, UriKind.Absolute, out var queuedUri)
+                && !IsImageUrl(queuedUri));
+            bool appendQueueNow = false;
+            bool queueAccepted = isQueueRequest && !hasCommand && queueValid
+                && TryAcceptIncomingQueueRequest(ctx.AcceptSequence, queuedMediaUrl!, out appendQueueNow);
+            bool accepted = isStatusCommand || isRemoteCommand || queueAccepted
+                || (!isQueueRequest && !hasCommand && valid && imagesValid
                     && (!string.IsNullOrWhiteSpace(mediaUrl) || !string.IsNullOrWhiteSpace(audioUrl) || imageUrls.Count > 0));
 
             string responseText = accepted ? "OK" : "Invalid or unsupported request";
@@ -311,7 +331,7 @@ public partial class MainWindow : Window
                 // a delayed parse if a newer media/stop operation was accepted meanwhile.
                 if (command is "stop" or "prev" or "previous" or "next")
                 {
-                    if (!TryBeginIncomingInvalidatingCommand(ctx.AcceptSequence)) return;
+                    if (!TryBeginIncomingInvalidatingCommand(ctx.AcceptSequence, command!)) return;
                     acceptedOperationSequence = ctx.AcceptSequence;
                 }
 
@@ -324,14 +344,26 @@ public partial class MainWindow : Window
                 });
                 return;
             }
-            if (accepted && (!string.IsNullOrWhiteSpace(mediaUrl)
+            if (isQueueRequest)
+            {
+                if (queueAccepted && appendQueueNow)
+                    Dispatcher.Invoke(() => AppendIncomingQueueItem(ctx.AcceptSequence, queuedMediaUrl!));
+                return;
+            }
+            if (accepted && !isQueueRequest && (!string.IsNullOrWhiteSpace(mediaUrl)
                 || !string.IsNullOrWhiteSpace(audioUrl) || imageUrls.Count > 0))
             {
                 var video = mediaUrl;
                 var audio = audioUrl;
                 var images = imageUrls.ToArray();
-                if (!TryBeginIncomingMediaRequest(ctx.AcceptSequence, out long requestSequence))
+                bool startsQueueSession = images.Length == 0
+                    && !string.IsNullOrWhiteSpace(video) && IsHttpUrl(video)
+                    && Uri.TryCreate(video, UriKind.Absolute, out var firstQueueUri)
+                    && !IsImageUrl(firstQueueUri);
+                if (!TryBeginIncomingMediaRequest(ctx.AcceptSequence, startsQueueSession, out long requestSequence))
                     return;
+                Dispatcher.Invoke(() => ResetIncomingQueueSession(
+                    ctx.AcceptSequence, video, audio, mediaHeaders, startsQueueSession));
                 if (!string.IsNullOrWhiteSpace(video) || images.Length > 0)
                 {
                     // Invalidate any older async player handoff as soon as the newer
@@ -362,7 +394,7 @@ public partial class MainWindow : Window
         Uri.TryCreate(value, UriKind.Absolute, out var uri)
         && (uri.Scheme == Uri.UriSchemeHttp || uri.Scheme == Uri.UriSchemeHttps);
 
-    private bool TryBeginIncomingMediaRequest(long acceptedSequence, out long requestSequence)
+    private bool TryBeginIncomingMediaRequest(long acceptedSequence, bool startsQueueSession, out long requestSequence)
     {
         lock (_mediaOperationSync)
         {
@@ -373,13 +405,141 @@ public partial class MainWindow : Window
             }
 
             _latestMediaOperationAcceptSequence = acceptedSequence;
+            _hasProcessedMediaOperation = true;
+            _incomingQueueSessionActive = startsQueueSession;
+            _incomingQueueSessionStartSequence = acceptedSequence;
+            _incomingQueueSessionInvalidationSequence = acceptedSequence;
+            if (!startsQueueSession)
+            {
+                _pendingIncomingQueue.Clear();
+                _incomingQueueItemCount = 0;
+            }
             requestSequence = Interlocked.Increment(ref _mediaRequestSequence);
             Interlocked.Exchange(ref _latestMediaRequestSequence, requestSequence);
             return true;
         }
     }
 
-    private bool TryBeginIncomingInvalidatingCommand(long acceptedSequence)
+    // Queue clients can finish parsing before the first /play request. Buffer those
+    // items until the first media request establishes a session, then sort by accept order.
+    private bool TryAcceptIncomingQueueRequest(long acceptedSequence, string videoUrl, out bool appendNow)
+    {
+        lock (_mediaOperationSync)
+        {
+            appendNow = false;
+            if (_incomingQueueSessionActive)
+            {
+                if (acceptedSequence <= _incomingQueueSessionStartSequence
+                    || acceptedSequence <= _incomingQueueSessionInvalidationSequence
+                    || _incomingQueueItemCount >= MaxIncomingQueueItems)
+                    return false;
+                _incomingQueueItemCount++;
+                appendNow = true;
+                return true;
+            }
+
+            if (acceptedSequence <= _latestMediaOperationAcceptSequence
+                || _hasProcessedMediaOperation
+                || _pendingIncomingQueue.Count >= MaxIncomingQueueItems - 1)
+                return false;
+
+            _pendingIncomingQueue.Add(new PendingIncomingQueueItem(acceptedSequence, videoUrl));
+            _incomingQueueItemCount++;
+            return true;
+        }
+    }
+
+    private void ResetIncomingQueueSession(
+        long acceptedSequence, string? videoUrl, string? audioUrl,
+        IReadOnlyDictionary<string, string> headers, bool startsQueueSession)
+    {
+        List<PendingIncomingQueueItem> pending;
+        lock (_mediaOperationSync)
+        {
+            if (_latestMediaOperationAcceptSequence != acceptedSequence
+                || _incomingQueueSessionActive != startsQueueSession)
+                return;
+
+            _incomingQueue.Clear();
+            _incomingQueueIndex = -1;
+            if (!startsQueueSession || string.IsNullOrWhiteSpace(videoUrl))
+            {
+                _pendingIncomingQueue.Clear();
+                _incomingQueueItemCount = 0;
+                return;
+            }
+
+            pending = _pendingIncomingQueue
+                .Where(x => x.AcceptSequence > acceptedSequence)
+                .OrderBy(x => x.AcceptSequence)
+                .ToList();
+            _pendingIncomingQueue.Clear();
+            _incomingQueueItemCount = 1 + pending.Count;
+        }
+
+        var headerCopy = headers.ToDictionary(
+            x => x.Key, x => x.Value, StringComparer.OrdinalIgnoreCase);
+        _incomingQueue.Add(new IncomingQueueItem(acceptedSequence, videoUrl, audioUrl, headerCopy));
+        foreach (var item in pending)
+            _incomingQueue.Add(new IncomingQueueItem(
+                item.AcceptSequence, item.VideoUrl, null,
+                new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase)));
+        _incomingQueueIndex = 0;
+    }
+
+    private void AppendIncomingQueueItem(long acceptedSequence, string videoUrl)
+    {
+        lock (_mediaOperationSync)
+        {
+            if (!_incomingQueueSessionActive
+                || acceptedSequence <= _incomingQueueSessionStartSequence
+                || acceptedSequence <= _incomingQueueSessionInvalidationSequence)
+                return;
+        }
+
+        var item = new IncomingQueueItem(
+            acceptedSequence, videoUrl, null,
+            new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase));
+        int insertAt = _incomingQueue.FindIndex(x => x.AcceptSequence > acceptedSequence);
+        if (insertAt < 0)
+            _incomingQueue.Add(item);
+        else
+        {
+            _incomingQueue.Insert(insertAt, item);
+            if (_incomingQueueIndex >= insertAt) _incomingQueueIndex++;
+        }
+    }
+
+    private void ClearIncomingQueueSession()
+    {
+        lock (_mediaOperationSync)
+        {
+            _incomingQueueSessionActive = false;
+            _hasProcessedMediaOperation = true;
+            _incomingQueueSessionInvalidationSequence = Math.Max(
+                _incomingQueueSessionInvalidationSequence, _listener?.LastAcceptedSequence ?? 0);
+            _incomingQueueItemCount = 0;
+            _pendingIncomingQueue.Clear();
+        }
+        _incomingQueue.Clear();
+        _incomingQueueIndex = -1;
+    }
+
+    private bool PlayIncomingQueueRelative(int direction)
+    {
+        if (!_incomingQueueSessionActive || _incomingQueueIndex < 0)
+            return false;
+        int target = _incomingQueueIndex + direction;
+        if (target < 0 || target >= _incomingQueue.Count)
+            return false;
+
+        _incomingQueueIndex = target;
+        var item = _incomingQueue[target];
+        ReceiveMedia(item.VideoUrl, item.AudioUrl, item.Headers);
+        return true;
+    }
+
+    private bool TryBeginIncomingInvalidatingCommand(long acceptedSequence, string command)
     {
         lock (_mediaOperationSync)
         {
@@ -387,6 +547,14 @@ public partial class MainWindow : Window
                 return false;
 
             _latestMediaOperationAcceptSequence = acceptedSequence;
+            _hasProcessedMediaOperation = true;
+            if (command is not ("prev" or "previous" or "next") || !_incomingQueueSessionActive)
+            {
+                _incomingQueueSessionActive = false;
+                _incomingQueueSessionInvalidationSequence = acceptedSequence;
+                _incomingQueueItemCount = 0;
+                _pendingIncomingQueue.Clear();
+            }
             long sequence = Interlocked.Increment(ref _mediaRequestSequence);
             Interlocked.Exchange(ref _latestMediaRequestSequence, sequence);
             return true;
@@ -401,6 +569,7 @@ public partial class MainWindow : Window
 
     private void InvalidatePendingMediaRequests()
     {
+        ClearIncomingQueueSession();
         lock (_mediaOperationSync)
         {
             // A local Stop/Home action cancels every request accepted before the click,
@@ -408,6 +577,11 @@ public partial class MainWindow : Window
             long acceptedSequence = _listener?.LastAcceptedSequence ?? 0;
             if (acceptedSequence > _latestMediaOperationAcceptSequence)
                 _latestMediaOperationAcceptSequence = acceptedSequence;
+            _incomingQueueSessionActive = false;
+            _hasProcessedMediaOperation = true;
+            _incomingQueueSessionInvalidationSequence = acceptedSequence;
+            _incomingQueueItemCount = 0;
+            _pendingIncomingQueue.Clear();
 
             long sequence = Interlocked.Increment(ref _mediaRequestSequence);
             Interlocked.Exchange(ref _latestMediaRequestSequence, sequence);
@@ -472,11 +646,11 @@ public partial class MainWindow : Window
             case "prev":
             case "previous": // Keep the descriptive alias for older/custom senders.
                 if (_imagePlaylist.Count > 0) AdvanceImage(-1);
-                else NavigateHistory(1, acceptedOperationSequence);
+                else if (!PlayIncomingQueueRelative(-1)) NavigateHistory(1, acceptedOperationSequence);
                 break;
             case "next":
                 if (_imagePlaylist.Count > 0) AdvanceImage(1);
-                else NavigateHistory(-1, acceptedOperationSequence);
+                else if (!PlayIncomingQueueRelative(1)) NavigateHistory(-1, acceptedOperationSequence);
                 break;
             case "volume_up":
                 VolumeSlider.Value = Math.Min(1, VolumeSlider.Value + 0.05);
@@ -495,6 +669,7 @@ public partial class MainWindow : Window
         if (_history.Count == 0) return;
         int target = _historyNavigationIndex + direction;
         if (target < 0 || target >= _history.Count) return;
+        ClearIncomingQueueSession();
         _historyNavigationIndex = target;
         _navigatingHistory = true;
         if (!acceptedOperationSequence.HasValue)
@@ -655,6 +830,7 @@ public partial class MainWindow : Window
 
     private void PlayAudioOnly(Uri uri, IReadOnlyDictionary<string, string>? headers = null)
     {
+        ClearIncomingQueueSession();
         Interlocked.Increment(ref _playRequestVersion);
         SaveCurrentResumePosition();
         _resumeSaveTimer.Stop();
@@ -1170,6 +1346,12 @@ public partial class MainWindow : Window
         PlayPauseButton.Content = "تشغيل";
         if (!string.IsNullOrWhiteSpace(_currentVideoUrl)) _resumePositions.Remove(_currentVideoUrl);
         SaveResumePositions();
+        if (_incomingQueueSessionActive && _incomingQueueIndex >= 0
+            && _incomingQueueIndex < _incomingQueue.Count
+            && string.Equals(_currentVideoUrl, _incomingQueue[_incomingQueueIndex].VideoUrl,
+                StringComparison.OrdinalIgnoreCase)
+            && PlayIncomingQueueRelative(1))
+            return;
     }
 
     private void ExpandMediaForPlayback()
@@ -1225,6 +1407,7 @@ public partial class MainWindow : Window
 
     private void StartImagePlaylist(IEnumerable<string> urls)
     {
+        ClearIncomingQueueSession();
         _imageSlideshowTimer.Stop();
         _imagePlaylist.Clear();
         _imagePlaylist.AddRange(urls.Where(IsHttpUrl)
@@ -1294,6 +1477,7 @@ public partial class MainWindow : Window
 
     private async void ShowImage(Uri uri)
     {
+        ClearIncomingQueueSession();
         int imageRequestVersion = Interlocked.Increment(ref _playRequestVersion);
         SaveCurrentResumePosition();
         _resumeSaveTimer.Stop();
@@ -1341,6 +1525,7 @@ public partial class MainWindow : Window
 
     private void ShowHome(long? acceptedOperationSequence = null)
     {
+        ClearIncomingQueueSession();
         if (!acceptedOperationSequence.HasValue)
             InvalidatePendingMediaRequests();
         Interlocked.Increment(ref _playRequestVersion);
