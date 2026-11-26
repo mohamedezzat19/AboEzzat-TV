@@ -1,0 +1,52 @@
+name: Windows installer verification
+
+on:
+  push:
+    branches:
+      - feature/libvlc-header-playback
+    paths:
+      - "windows/**"
+      - "installer/**"
+      - ".github/workflows/windows-header-proxy-build.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  build-windows-installer:
+    name: Build Windows x64 installer
+    runs-on: windows-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup .NET 8
+        uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: 8.0.x
+
+      - name: Restore
+        run: dotnet restore windows/AboEzzatReceiver.Windows.csproj --runtime win-x64
+
+      - name: Publish self-contained Windows x64 app
+        run: dotnet publish windows/AboEzzatReceiver.Windows.csproj --configuration Release --runtime win-x64 --self-contained true --no-restore -p:PublishSingleFile=false -o windows/publish/win-x64
+
+      - name: Install Inno Setup
+        run: choco install innosetup --yes --no-progress
+
+      - name: Build Setup.exe
+        shell: pwsh
+        run: |
+          $compiler = "${env:ProgramFiles(x86)}\Inno Setup 6\ISCC.exe"
+          if (!(Test-Path $compiler)) { throw "Inno Setup compiler not found: $compiler" }
+          & $compiler installer/AboEzzat-TV.iss /Oinstaller/Output
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+
+      - name: Upload Windows installer
+        uses: actions/upload-artifact@v4
+        with:
+          name: AboEzzat-TV-Windows-Setup
+          path: installer/Output/AboEzzat-TV-Setup.exe
+          if-no-files-found: error
+          retention-days: 90
