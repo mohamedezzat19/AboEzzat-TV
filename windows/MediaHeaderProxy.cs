@@ -452,9 +452,7 @@ internal sealed class MediaHeaderProxy : IDisposable
         && first.Port == second.Port;
 
     private static bool IsRedirect(HttpStatusCode status) =>
-        status is HttpStatusCode.MovedPermanently or HttpStatusCode.Redirect
-            or HttpStatusCode.RedirectMethod or HttpStatusCode.TemporaryRedirect
-            or HttpStatusCode.PermanentRedirect;
+        (int)status is 301 or 302 or 303 or 307 or 308;
 
     private static string SafeHeader(string value) =>
         value.Replace("\r", string.Empty).Replace("\n", string.Empty);
