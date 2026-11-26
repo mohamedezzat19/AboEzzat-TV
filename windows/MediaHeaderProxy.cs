@@ -60,7 +60,9 @@ internal sealed class MediaHeaderProxy : IDisposable
 
         EnsureStarted();
         string id = Convert.ToHexString(RandomNumberGenerator.GetBytes(16)).ToLowerInvariant();
-        var state = new ProxySessionState(rootUri, NormalizeHeaders(headers));
+        var normalizedHeaders = NormalizeHeaders(headers);
+        var cookieOrigin = GetCookieOrigin(rootUri, normalizedHeaders);
+        var state = new ProxySessionState(rootUri, cookieOrigin, normalizedHeaders);
         if (!_sessions.TryAdd(id, state))
             throw new InvalidOperationException("Could not create a media proxy session.");
         return new Session(this, id);
@@ -199,11 +201,16 @@ internal sealed class MediaHeaderProxy : IDisposable
                 VersionPolicy = HttpVersionPolicy.RequestVersionOrLower
             };
 
-            bool sameOrigin = IsSameOrigin(session.RootUri, currentUri);
+            bool sameRootOrigin = IsSameOrigin(session.RootUri, currentUri);
+            bool sameCookieOrigin = IsSameOrigin(session.CookieOriginUri, currentUri);
             foreach (var pair in session.Headers)
             {
                 if (HopByHopHeaders.Contains(pair.Key)) continue;
-                if (!sameOrigin && SensitiveHeaders.Contains(pair.Key)) continue;
+                if (pair.Key.Equals("Cookie", StringComparison.OrdinalIgnoreCase) && !sameCookieOrigin)
+                    continue;
+                if (!pair.Key.Equals("Cookie", StringComparison.OrdinalIgnoreCase)
+                    && SensitiveHeaders.Contains(pair.Key) && !sameRootOrigin)
+                    continue;
                 request.Headers.TryAddWithoutValidation(pair.Key, pair.Value);
             }
 
@@ -429,6 +436,19 @@ internal sealed class MediaHeaderProxy : IDisposable
         return null;
     }
 
+    private static Uri GetCookieOrigin(Uri rootUri, IReadOnlyDictionary<string, string> headers)
+    {
+        if (headers.TryGetValue("Origin", out var origin)
+            && Uri.TryCreate(origin, UriKind.Absolute, out var originUri) && IsHttpUri(originUri))
+            return originUri;
+
+        if (headers.TryGetValue("Referer", out var referer)
+            && Uri.TryCreate(referer, UriKind.Absolute, out var refererUri) && IsHttpUri(refererUri))
+            return refererUri;
+
+        return rootUri;
+    }
+
     private static Dictionary<string, string> NormalizeHeaders(IReadOnlyDictionary<string, string>? headers)
     {
         var result = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
@@ -497,7 +517,8 @@ internal sealed class MediaHeaderProxy : IDisposable
         }
     }
 
-    private sealed record ProxySessionState(Uri RootUri, Dictionary<string, string> Headers);
+    private sealed record ProxySessionState(
+        Uri RootUri, Uri CookieOriginUri, Dictionary<string, string> Headers);
     private sealed record LocalRequest(string Method, string Target, Dictionary<string, string> Headers);
 
     internal sealed class Session : IDisposable
