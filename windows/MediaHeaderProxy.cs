@@ -158,15 +158,13 @@ internal sealed class MediaHeaderProxy : IDisposable
             return;
         }
 
-        using var upstreamTimeout = CancellationTokenSource.CreateLinkedTokenSource(serverToken);
-        upstreamTimeout.CancelAfter(TimeSpan.FromMinutes(5));
         try
         {
             var (response, finalUri) = await SendUpstreamAsync(
-                localRequest, remoteUri!, session, upstreamTimeout.Token).ConfigureAwait(false);
+                localRequest, remoteUri!, session, serverToken).ConfigureAwait(false);
             using (response)
                 await WriteUpstreamResponseAsync(
-                    stream, response, localRequest.Method, remoteUri!, finalUri, sessionId, upstreamTimeout.Token)
+                    stream, response, localRequest.Method, remoteUri!, finalUri, sessionId, serverToken)
                     .ConfigureAwait(false);
         }
         catch (OperationCanceledException) when (serverToken.IsCancellationRequested) { }
@@ -216,8 +214,10 @@ internal sealed class MediaHeaderProxy : IDisposable
                     request.Headers.TryAddWithoutValidation(name, value);
             }
 
+            using var headerTimeout = CancellationTokenSource.CreateLinkedTokenSource(token);
+            headerTimeout.CancelAfter(TimeSpan.FromSeconds(45));
             var response = await _http!.SendAsync(
-                request, HttpCompletionOption.ResponseHeadersRead, token).ConfigureAwait(false);
+                request, HttpCompletionOption.ResponseHeadersRead, headerTimeout.Token).ConfigureAwait(false);
 
             if (!IsRedirect(response.StatusCode) || response.Headers.Location is null || redirect == MaxRedirects)
                 return (response, currentUri);
@@ -303,7 +303,7 @@ internal sealed class MediaHeaderProxy : IDisposable
         if (!string.IsNullOrWhiteSpace(contentRange))
             builder.Append("Content-Range: ").Append(SafeHeader(contentRange)).Append("\r\n");
 
-        var acceptRanges = response.Content.Headers.AcceptRanges;
+        var acceptRanges = response.Headers.AcceptRanges;
         if (acceptRanges.Count > 0)
             builder.Append("Accept-Ranges: ").Append(SafeHeader(string.Join(", ", acceptRanges))).Append("\r\n");
 
