@@ -393,11 +393,12 @@ internal sealed class MediaHeaderProxy : IDisposable
         sessionId = string.Empty;
         remoteUri = null;
         Uri localUri;
-        if (!Uri.TryCreate(target, UriKind.Absolute, out localUri!))
-        {
-            if (!Uri.TryCreate(new Uri($"http://127.0.0.1:{_port}/"), target, out localUri!))
-                return false;
-        }
+        if (Uri.TryCreate(target, UriKind.Absolute, out var absoluteUri))
+            localUri = absoluteUri;
+        else if (Uri.TryCreate(new Uri($"http://127.0.0.1:{_port}/"), target, out var relativeUri))
+            localUri = relativeUri;
+        else
+            return false;
 
         string[] segments = localUri.AbsolutePath.Split('/', StringSplitOptions.RemoveEmptyEntries);
         if (segments.Length != 2 || !segments[0].Equals("p", StringComparison.Ordinal))
