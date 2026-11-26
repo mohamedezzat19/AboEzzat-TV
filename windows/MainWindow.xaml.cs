@@ -20,6 +20,10 @@ public partial class MainWindow : Window
     private const int DiscoveryPort = 37020;
     private const string DiscoveryGroup = "239.255.42.99";
     private readonly VlcAudioPlayback AudioPlayer;
+    private readonly MediaHeaderProxy _mediaHeaderProxy = new();
+    private MediaHeaderProxy.Session? _videoProxySession;
+    private MediaHeaderProxy.Session? _audioProxySession;
+    private IReadOnlyDictionary<string, string>? _imagePlaylistHeaders;
     private TcpHttpListener? _listener;
     // TcpHttpListener parses accepted sockets concurrently. Parsed requests are serialized
     // here, and each context carries its original accept sequence to reject stale operations.
@@ -417,6 +421,33 @@ public partial class MainWindow : Window
         finally { try { ctx.Response.Close(); } catch { } }
     }
 
+    private static bool RequiresHeaderProxy(IReadOnlyDictionary<string, string>? headers)
+    {
+        if (headers is null || headers.Count == 0) return false;
+        return headers.Keys.Any(name =>
+            !name.Equals("User-Agent", StringComparison.OrdinalIgnoreCase)
+            && !name.Equals("Referer", StringComparison.OrdinalIgnoreCase));
+    }
+
+    private static bool TryGetRequestHeader(
+        IReadOnlyDictionary<string, string>? headers, string name, out string value)
+    {
+        if (headers is not null)
+        {
+            foreach (var pair in headers)
+            {
+                if (string.Equals(pair.Key, name, StringComparison.OrdinalIgnoreCase)
+                    && !string.IsNullOrWhiteSpace(pair.Value))
+                {
+                    value = pair.Value;
+                    return true;
+                }
+            }
+        }
+        value = string.Empty;
+        return false;
+    }
+
     private static bool IsHttpUrl(string? value) =>
         Uri.TryCreate(value, UriKind.Absolute, out var uri)
         && (uri.Scheme == Uri.UriSchemeHttp || uri.Scheme == Uri.UriSchemeHttps);
@@ -624,7 +655,7 @@ public partial class MainWindow : Window
             if (requestSequence != Interlocked.Read(ref _latestMediaRequestSequence)) return;
 
             if (images.Length == 0 && !string.IsNullOrWhiteSpace(video)
-                && ShouldProbeRemoteImage(video) && await IsRemoteImageAsync(video))
+                && ShouldProbeRemoteImage(video) && await IsRemoteImageAsync(video, headers))
                 images = new[] { video };
 
             if (requestSequence != Interlocked.Read(ref _latestMediaRequestSequence)) return;
@@ -634,7 +665,7 @@ public partial class MainWindow : Window
                 // Recheck on the UI thread: a newer request may have arrived
                 // after the network probe completed but before this callback ran.
                 if (requestSequence != Interlocked.Read(ref _latestMediaRequestSequence)) return;
-                if (images.Length > 0) StartImagePlaylist(images);
+                if (images.Length > 0) StartImagePlaylist(images, headers);
                 else ReceiveMedia(video, audio, headers);
             });
         }
@@ -717,13 +748,28 @@ public partial class MainWindow : Window
         return !knownMediaExtensions.Contains(extension, StringComparer.OrdinalIgnoreCase);
     }
 
-    private static async Task<bool> IsRemoteImageAsync(string url)
+    private async Task<bool> IsRemoteImageAsync(
+        string url, IReadOnlyDictionary<string, string>? headers = null)
     {
+        if (!Uri.TryCreate(url, UriKind.Absolute, out var sourceUri) || !IsHttpUrl(url))
+            return false;
         try
         {
+            using var proxySession = RequiresHeaderProxy(headers)
+                ? _mediaHeaderProxy.CreateSession(sourceUri, headers) : null;
+            Uri probeUri = proxySession?.GetProxyUri(sourceUri) ?? sourceUri;
             using var http = new HttpClient { Timeout = TimeSpan.FromSeconds(4) };
-            http.DefaultRequestHeaders.UserAgent.ParseAdd("AboEzzat-TV/1.0");
-            using var request = new HttpRequestMessage(HttpMethod.Head, url);
+            using var request = new HttpRequestMessage(HttpMethod.Head, probeUri);
+            if (proxySession is null)
+            {
+                request.Headers.TryAddWithoutValidation("User-Agent",
+                    TryGetRequestHeader(headers, "User-Agent", out var userAgent)
+                        ? userAgent : "AboEzzat-TV/1.0");
+                request.Headers.TryAddWithoutValidation("Accept",
+                    TryGetRequestHeader(headers, "Accept", out var accept) ? accept : "*/*");
+                if (TryGetRequestHeader(headers, "Referer", out var referer))
+                    request.Headers.TryAddWithoutValidation("Referer", referer);
+            }
             using var response = await http.SendAsync(request, HttpCompletionOption.ResponseHeadersRead);
             return response.IsSuccessStatusCode
                 && response.Content.Headers.ContentType?.MediaType?.StartsWith("image/", StringComparison.OrdinalIgnoreCase) == true;
@@ -745,7 +791,7 @@ public partial class MainWindow : Window
                 _imageIndex = 0;
                 _imageSlideshowEnabled = false;
                 StopAudioDeck();
-                ShowImage(videoUri);
+                ShowImage(videoUri, headers);
                 UpdateImageControls();
             }
             else
@@ -850,8 +896,35 @@ public partial class MainWindow : Window
     {
         AudioPlayer.Stop();
         AudioPlayer.Source = null;
-        AudioPlayer.RequestHeaders = headers;
-        AudioPlayer.Source = uri;
+        _audioProxySession?.Dispose();
+        _audioProxySession = null;
+
+        Uri playbackUri = uri;
+        if (RequiresHeaderProxy(headers))
+        {
+            try
+            {
+                // Keep cookies scoped to the original video origin for companion audio.
+                Uri headerOrigin = Uri.TryCreate(_currentVideoUrl, UriKind.Absolute, out var videoOrigin)
+                    ? videoOrigin : uri;
+                _audioProxySession = _mediaHeaderProxy.CreateSession(headerOrigin, headers);
+                playbackUri = _audioProxySession.GetProxyUri(uri);
+                AudioPlayer.RequestHeaders = null;
+            }
+            catch (Exception ex)
+            {
+                System.Diagnostics.Debug.WriteLine($"Audio header proxy unavailable; using direct VLC headers: {ex.Message}");
+                _audioProxySession?.Dispose();
+                _audioProxySession = null;
+                AudioPlayer.RequestHeaders = headers;
+            }
+        }
+        else
+        {
+            AudioPlayer.RequestHeaders = headers;
+        }
+
+        AudioPlayer.Source = playbackUri;
         AudioPlayer.Play(startAt);
     }
 
@@ -870,6 +943,7 @@ public partial class MainWindow : Window
         _pendingSeparateAudio = null;
         _pendingAudioHeaders = null;
         ExpandMediaForPlayback();
+        StopAudioDeck();
         VideoPlayer.Stop();
         VideoPlayer.Source = null;
         VideoPlayer.Visibility = Visibility.Collapsed;
@@ -883,6 +957,11 @@ public partial class MainWindow : Window
     {
         AudioPlayer.Stop();
         AudioPlayer.Source = null;
+        AudioPlayer.RequestHeaders = null;
+        _audioProxySession?.Dispose();
+        _audioProxySession = null;
+        _videoProxySession?.Dispose();
+        _videoProxySession = null;
     }
 
     private void ClearSubtitleOverlay()
@@ -1086,7 +1165,29 @@ public partial class MainWindow : Window
         ReceivedImage.Visibility = Visibility.Collapsed;
         VideoPlayer.Stop();
         VideoPlayer.Source = null;
-        VideoPlayer.RequestHeaders = headers;
+
+        Uri playbackUri = uri;
+        if (RequiresHeaderProxy(headers))
+        {
+            try
+            {
+                _videoProxySession = _mediaHeaderProxy.CreateSession(uri, headers);
+                playbackUri = _videoProxySession.GetProxyUri(uri);
+                VideoPlayer.RequestHeaders = null;
+            }
+            catch (Exception ex)
+            {
+                System.Diagnostics.Debug.WriteLine($"Video header proxy unavailable; using direct VLC headers: {ex.Message}");
+                _videoProxySession?.Dispose();
+                _videoProxySession = null;
+                VideoPlayer.RequestHeaders = headers;
+            }
+        }
+        else
+        {
+            VideoPlayer.RequestHeaders = headers;
+        }
+
         WelcomePanel.Visibility = Visibility.Collapsed;
         VideoPlayer.Visibility = Visibility.Visible;
         await Task.Delay(150);
@@ -1094,10 +1195,9 @@ public partial class MainWindow : Window
         if (requestVersion != Volatile.Read(ref _playRequestVersion)
             || !string.Equals(_currentVideoUrl, uri.AbsoluteUri, StringComparison.OrdinalIgnoreCase))
             return;
-        VideoPlayer.Source = uri;
+        VideoPlayer.Source = playbackUri;
         VideoPlayer.Position = TimeSpan.Zero;
         VideoPlayer.Play();
-
     }
 
     private void Window_PreviewKeyDown(object sender, System.Windows.Input.KeyEventArgs e)
@@ -1432,9 +1532,10 @@ public partial class MainWindow : Window
         MediaPanel.CornerRadius = new CornerRadius(0);
     }
 
-    private void StartImagePlaylist(IEnumerable<string> urls)
+    private void StartImagePlaylist(IEnumerable<string> urls, IReadOnlyDictionary<string, string>? headers = null)
     {
         ClearIncomingQueueSession();
+        _imagePlaylistHeaders = headers;
         _imageSlideshowTimer.Stop();
         _imagePlaylist.Clear();
         _imagePlaylist.AddRange(urls.Where(IsHttpUrl)
@@ -1458,7 +1559,7 @@ public partial class MainWindow : Window
         VideoPlayer.Visibility = Visibility.Collapsed;
         _currentVideoUrl = null;
         _imageIndex = 0;
-        ShowImage(_imagePlaylist[_imageIndex]);
+        ShowImage(_imagePlaylist[_imageIndex], _imagePlaylistHeaders);
         _imageSlideshowEnabled = _imagePlaylist.Count > 1;
         if (_imageSlideshowEnabled) _imageSlideshowTimer.Start();
         UpdateImageControls();
@@ -1468,7 +1569,7 @@ public partial class MainWindow : Window
     {
         if (_imagePlaylist.Count == 0) return;
         _imageIndex = (_imageIndex + direction + _imagePlaylist.Count) % _imagePlaylist.Count;
-        ShowImage(_imagePlaylist[_imageIndex]);
+        ShowImage(_imagePlaylist[_imageIndex], _imagePlaylistHeaders);
         UpdateImageControls();
     }
 
@@ -1502,7 +1603,7 @@ public partial class MainWindow : Window
         ImageSlideshowButton.Content = _imageSlideshowEnabled ? "إيقاف العرض" : "تشغيل العرض";
     }
 
-    private async void ShowImage(Uri uri)
+    private async void ShowImage(Uri uri, IReadOnlyDictionary<string, string>? headers = null)
     {
         ClearIncomingQueueSession();
         int imageRequestVersion = Interlocked.Increment(ref _playRequestVersion);
@@ -1526,10 +1627,24 @@ public partial class MainWindow : Window
         {
             // Download to a local stream rather than relying on WPF's direct URI
             // loader; social CDN URLs may redirect or contain long query strings.
+            using var proxySession = RequiresHeaderProxy(headers)
+                ? _mediaHeaderProxy.CreateSession(uri, headers) : null;
+            Uri imageRequestUri = proxySession?.GetProxyUri(uri) ?? uri;
             using var http = new HttpClient { Timeout = TimeSpan.FromSeconds(30) };
-            http.DefaultRequestHeaders.UserAgent.ParseAdd("AboEzzat-TV/1.0");
-            http.DefaultRequestHeaders.Accept.ParseAdd("image/*");
-            var bytes = await http.GetByteArrayAsync(uri);
+            using var request = new HttpRequestMessage(HttpMethod.Get, imageRequestUri);
+            if (proxySession is null)
+            {
+                request.Headers.TryAddWithoutValidation("User-Agent",
+                    TryGetRequestHeader(headers, "User-Agent", out var userAgent)
+                        ? userAgent : "AboEzzat-TV/1.0");
+                request.Headers.TryAddWithoutValidation("Accept",
+                    TryGetRequestHeader(headers, "Accept", out var accept) ? accept : "image/*");
+                if (TryGetRequestHeader(headers, "Referer", out var referer))
+                    request.Headers.TryAddWithoutValidation("Referer", referer);
+            }
+            using var response = await http.SendAsync(request, HttpCompletionOption.ResponseHeadersRead);
+            response.EnsureSuccessStatusCode();
+            var bytes = await response.Content.ReadAsByteArrayAsync();
             if (imageRequestVersion != Volatile.Read(ref _playRequestVersion)) return;
             using var stream = new MemoryStream(bytes);
             var bitmap = new BitmapImage();
@@ -1571,6 +1686,7 @@ public partial class MainWindow : Window
         VideoPlayer.Visibility = Visibility.Collapsed;
         _imageSlideshowTimer.Stop();
         _imagePlaylist.Clear();
+        _imagePlaylistHeaders = null;
         _imageIndex = 0;
         _imageSlideshowEnabled = false;
         ReceivedImage.Source = null;
@@ -1697,6 +1813,7 @@ public partial class MainWindow : Window
                 try { pending.Response.Close(); } catch { }
             _listener?.Stop();
             _listener?.Close();
+            _mediaHeaderProxy.Dispose();
         }
         catch { }
     }
