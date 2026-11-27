@@ -18,22 +18,142 @@
     <Image x:Name="ReceivedImage" Stretch="Uniform" Visibility="Collapsed"/>
     <Grid x:Name="VideoOverlayLayer" Background="#02000000" MouseMove="MediaPanel_MouseMove">
      <TextBlock x:Name="SubtitleOverlay" Visibility="Collapsed" HorizontalAlignment="Center" VerticalAlignment="Bottom" Margin="30,0,30,72" Padding="8,4" TextAlignment="Center" TextWrapping="Wrap" FontSize="26" FontWeight="SemiBold" Foreground="White" Background="#99000000" IsHitTestVisible="False"/>
-     <Border x:Name="PlaybackControls" HorizontalAlignment="Stretch" VerticalAlignment="Bottom" Margin="20,0,20,18" Padding="12,10" Background="#DD101A35" CornerRadius="14" Visibility="Collapsed">
-      <StackPanel>
-       <DockPanel LastChildFill="False">
-        <TextBlock x:Name="PlaybackTimeText" Text="00:00 / 00:00" Foreground="White" VerticalAlignment="Center" DockPanel.Dock="Left" Margin="0,0,10,0"/>
-        <Button x:Name="SubtitleButton" Content="ترجمة عربية" Click="Subtitle_Click" Padding="10,5" Background="#25345D" Foreground="White" BorderThickness="0" DockPanel.Dock="Right" ToolTip="ابحث عن ترجمة عربية للفيديو الحالي"/>
+     <Border x:Name="PlaybackControls" HorizontalAlignment="Stretch" VerticalAlignment="Bottom" Margin="24,0,24,18" Padding="14,10" Background="#18071328" CornerRadius="14" Visibility="Collapsed">
+      <Border.Resources>
+       <Style x:Key="PlayerIconButton" TargetType="Button">
+        <Setter Property="Background" Value="Transparent"/>
+        <Setter Property="Foreground" Value="#F5F7FF"/>
+        <Setter Property="BorderThickness" Value="0"/>
+        <Setter Property="Padding" Value="11,7"/>
+        <Setter Property="FontSize" Value="22"/>
+        <Setter Property="FontFamily" Value="Segoe UI Symbol"/>
+        <Setter Property="Cursor" Value="Hand"/>
+        <Setter Property="FocusVisualStyle" Value="{x:Null}"/>
+        <Setter Property="Template">
+         <Setter.Value>
+          <ControlTemplate TargetType="Button">
+           <Border x:Name="Chrome" Background="{TemplateBinding Background}" CornerRadius="9"
+                   Padding="{TemplateBinding Padding}" BorderBrush="Transparent" BorderThickness="1">
+            <ContentPresenter HorizontalAlignment="Center" VerticalAlignment="Center"/>
+           </Border>
+           <ControlTemplate.Triggers>
+            <Trigger Property="IsMouseOver" Value="True">
+             <Setter TargetName="Chrome" Property="Background" Value="#263B6D"/>
+             <Setter TargetName="Chrome" Property="BorderBrush" Value="#3288FF"/>
+            </Trigger>
+            <Trigger Property="IsKeyboardFocused" Value="True">
+             <Setter TargetName="Chrome" Property="Background" Value="#2A477C"/>
+             <Setter TargetName="Chrome" Property="BorderBrush" Value="#3D91FF"/>
+             <Setter TargetName="Chrome" Property="Effect">
+              <Setter.Value><DropShadowEffect Color="#3288FF" BlurRadius="16" ShadowDepth="0" Opacity="0.8"/></Setter.Value>
+             </Setter>
+            </Trigger>
+            <Trigger Property="IsEnabled" Value="False">
+             <Setter Property="Opacity" Value="0.4"/>
+            </Trigger>
+           </ControlTemplate.Triggers>
+          </ControlTemplate>
+         </Setter.Value>
+        </Setter>
+       </Style>
+       <Style x:Key="SeekTrackButton" TargetType="RepeatButton">
+        <Setter Property="Focusable" Value="False"/>
+        <Setter Property="IsTabStop" Value="False"/>
+        <Setter Property="Template">
+         <Setter.Value>
+          <ControlTemplate TargetType="RepeatButton">
+           <Border Background="{TemplateBinding Background}" Height="3" CornerRadius="2"/>
+          </ControlTemplate>
+         </Setter.Value>
+        </Setter>
+       </Style>
+       <Style x:Key="SeekThumb" TargetType="Thumb">
+        <Setter Property="Width" Value="14"/>
+        <Setter Property="Height" Value="14"/>
+        <Setter Property="Background" Value="#2D8CFF"/>
+        <Setter Property="BorderBrush" Value="#B6D9FF"/>
+        <Setter Property="BorderThickness" Value="1"/>
+        <Setter Property="Template">
+         <Setter.Value>
+          <ControlTemplate TargetType="Thumb">
+           <Ellipse Fill="{TemplateBinding Background}" Stroke="{TemplateBinding BorderBrush}"
+                    StrokeThickness="1">
+            <Ellipse.Effect><DropShadowEffect Color="#2D8CFF" BlurRadius="12" ShadowDepth="0" Opacity="0.85"/></Ellipse.Effect>
+           </Ellipse>
+          </ControlTemplate>
+         </Setter.Value>
+        </Setter>
+       </Style>
+       <Style x:Key="PlayerSeekSlider" TargetType="Slider">
+        <Setter Property="Height" Value="22"/>
+        <Setter Property="Background" Value="Transparent"/>
+        <Setter Property="Foreground" Value="#2D8CFF"/>
+        <Setter Property="Template">
+         <Setter.Value>
+          <ControlTemplate TargetType="Slider">
+           <Grid Background="Transparent">
+            <Track x:Name="PART_Track" IsDirectionReversed="{TemplateBinding IsDirectionReversed}">
+             <Track.DecreaseRepeatButton>
+              <RepeatButton Style="{StaticResource SeekTrackButton}" Background="#2D8CFF"
+                            Command="{x:Static Slider.DecreaseLarge}"/>
+             </Track.DecreaseRepeatButton>
+             <Track.Thumb><Thumb Style="{StaticResource SeekThumb}"/></Track.Thumb>
+             <Track.IncreaseRepeatButton>
+              <RepeatButton Style="{StaticResource SeekTrackButton}" Background="#34415D"
+                            Command="{x:Static Slider.IncreaseLarge}"/>
+             </Track.IncreaseRepeatButton>
+            </Track>
+           </Grid>
+          </ControlTemplate>
+         </Setter.Value>
+        </Setter>
+       </Style>
+      </Border.Resources>
+      <Grid>
+       <Grid.RowDefinitions>
+        <RowDefinition Height="Auto"/>
+        <RowDefinition Height="22"/>
+        <RowDefinition Height="Auto"/>
+       </Grid.RowDefinitions>
+       <DockPanel Grid.Row="0" LastChildFill="False" Margin="2,0,2,2">
+        <TextBlock x:Name="PlaybackTimeText" Text="00:00 / 00:00" Foreground="#E9EEFF"
+                   FontSize="12" VerticalAlignment="Center" DockPanel.Dock="Left"/>
+        <TextBlock x:Name="DownloadStatusText" Text="" Foreground="#7DB7FF"
+                   FontSize="12" VerticalAlignment="Center" DockPanel.Dock="Right"/>
        </DockPanel>
-       <Slider x:Name="SeekSlider" Minimum="0" Maximum="100" Value="0" Margin="0,4,0,2" IsMoveToPointEnabled="True" PreviewMouseLeftButtonUp="SeekSlider_MouseLeftButtonUp"/>
-       <StackPanel Orientation="Horizontal" HorizontalAlignment="Center">
-        <Button Content="−10 ث" Click="Back10_Click" Margin="4,2" Padding="12,5" Background="#25345D" Foreground="White" BorderThickness="0"/>
-        <Button x:Name="PlayPauseButton" Content="إيقاف مؤقت" Click="PlayPause_Click" Margin="4,2" Padding="14,5" Background="#238F70" Foreground="White" BorderThickness="0"/>
-        <Button Content="+10 ث" Click="Forward10_Click" Margin="4,2" Padding="12,5" Background="#25345D" Foreground="White" BorderThickness="0"/>
-        <TextBlock Text="الصوت" Foreground="White" VerticalAlignment="Center" Margin="14,0,4,0"/>
-        <Slider x:Name="VolumeSlider" Width="110" Minimum="0" Maximum="1" Value="0.8" VerticalAlignment="Center" ValueChanged="VolumeSlider_ValueChanged"/>
-        <Button x:Name="MuteButton" Content="كتم" Click="Mute_Click" Margin="4,2" Padding="10,5" Background="#25345D" Foreground="White" BorderThickness="0"/>
-       </StackPanel>
-      </StackPanel>
+       <Slider x:Name="SeekSlider" Grid.Row="1" Style="{StaticResource PlayerSeekSlider}"
+               Minimum="0" Maximum="100" Value="0" Margin="0,0,0,2"
+               IsMoveToPointEnabled="True" PreviewMouseLeftButtonUp="SeekSlider_MouseLeftButtonUp"/>
+       <Grid Grid.Row="2" Margin="0,3,0,0">
+        <Grid.ColumnDefinitions>
+         <ColumnDefinition Width="*"/>
+         <ColumnDefinition Width="Auto"/>
+         <ColumnDefinition Width="*"/>
+        </Grid.ColumnDefinitions>
+        <StackPanel Grid.Column="0" Orientation="Horizontal" HorizontalAlignment="Left" VerticalAlignment="Center">
+         <Button x:Name="MuteButton" Content="🔊" Click="Mute_Click" Style="{StaticResource PlayerIconButton}"
+                 FontSize="18" ToolTip="كتم الصوت"/>
+         <Slider x:Name="VolumeSlider" Width="92" Minimum="0" Maximum="1" Value="0.8"
+                 VerticalAlignment="Center" ValueChanged="VolumeSlider_ValueChanged"/>
+        </StackPanel>
+        <StackPanel Grid.Column="1" Orientation="Horizontal" HorizontalAlignment="Center" VerticalAlignment="Center">
+         <Button Content="⏪ 10" Click="Back10_Click" Style="{StaticResource PlayerIconButton}" ToolTip="رجوع 10 ثوانٍ"/>
+         <Button x:Name="PlayPauseButton" Content="Ⅱ" Click="PlayPause_Click"
+                 Style="{StaticResource PlayerIconButton}" FontSize="27" Padding="15,6"
+                 Foreground="#65B6FF" ToolTip="تشغيل أو إيقاف مؤقت"/>
+         <Button Content="10 ⏩" Click="Forward10_Click" Style="{StaticResource PlayerIconButton}" ToolTip="تقديم 10 ثوانٍ"/>
+        </StackPanel>
+        <StackPanel Grid.Column="2" Orientation="Horizontal" HorizontalAlignment="Right" VerticalAlignment="Center">
+         <Button Content="⚙" Click="Settings_Click" Style="{StaticResource PlayerIconButton}" ToolTip="إعدادات الريسيفر"/>
+         <Button x:Name="SubtitleButton" Content="CC" Click="Subtitle_Click" Style="{StaticResource PlayerIconButton}"
+                 FontSize="16" ToolTip="البحث عن ترجمة عربية"/>
+         <Button x:Name="DownloadButton" Content="↓" Click="DownloadCurrentMedia_Click"
+                 Style="{StaticResource PlayerIconButton}" ToolTip="تنزيل ملف الفيديو المباشر"/>
+         <Button x:Name="RepeatButton" Content="↻" Click="Repeat_Click"
+                 Style="{StaticResource PlayerIconButton}" ToolTip="إيقاف التكرار"/>
+        </StackPanel>
+       </Grid>
+      </Grid>
      </Border>
     </Grid>
     <Grid x:Name="WelcomePanel" HorizontalAlignment="Stretch" VerticalAlignment="Stretch" Background="#030C20">
