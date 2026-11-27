@@ -1082,7 +1082,7 @@ public partial class MainWindow : Window
         finally
         {
             SubtitleButton.IsEnabled = true;
-            SubtitleButton.Content = "ترجمة عربية";
+            SubtitleButton.Content = "CC";
         }
     }
 
