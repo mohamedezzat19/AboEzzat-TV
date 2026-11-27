@@ -5,6 +5,7 @@ using System.Net;
 using System.Net.Sockets;
 using System.Text;
 using System.Text.Json;
+using Microsoft.Win32;
 using System.Text.RegularExpressions;
 using System.Threading.Channels;
 using System.Windows.Threading;
@@ -69,6 +70,11 @@ public partial class MainWindow : Window
     private readonly DispatcherTimer _resumeSaveTimer = new() { Interval = TimeSpan.FromSeconds(5) };
     private readonly Dictionary<string, double> _resumePositions = new(StringComparer.OrdinalIgnoreCase);
     private string? _currentVideoUrl;
+    private Uri? _currentSeparateAudioUri;
+    private IReadOnlyDictionary<string, string>? _currentMediaHeaders;
+    private bool _isPaused;
+    private enum RepeatMode { Off, One, Playlist }
+    private RepeatMode _repeatMode = RepeatMode.Off;
     private Uri? _pendingSeparateAudio;
     private IReadOnlyDictionary<string, string>? _pendingAudioHeaders;
     private bool _resumePromptHandled;
@@ -587,13 +593,32 @@ public partial class MainWindow : Window
     {
         if (!_incomingQueueSessionActive || _incomingQueueIndex < 0)
             return false;
-        int target = _incomingQueueIndex + direction;
-        if (target < 0 || target >= _incomingQueue.Count)
+        return PlayIncomingQueueAt(_incomingQueueIndex + direction);
+    }
+
+    private bool PlayIncomingQueueAt(int target)
+    {
+        if (!_incomingQueueSessionActive || target < 0 || target >= _incomingQueue.Count)
             return false;
 
         _incomingQueueIndex = target;
         var item = _incomingQueue[target];
         ReceiveMedia(item.VideoUrl, item.AudioUrl, item.Headers);
+        return true;
+    }
+
+    private bool ReplayCurrentVideo()
+    {
+        if (_incomingQueueSessionActive && _incomingQueueIndex >= 0
+            && _incomingQueueIndex < _incomingQueue.Count)
+        {
+            var item = _incomingQueue[_incomingQueueIndex];
+            ReceiveMedia(item.VideoUrl, item.AudioUrl, item.Headers);
+            return true;
+        }
+
+        if (!IsHttpUrl(_currentVideoUrl)) return false;
+        ReceiveMedia(_currentVideoUrl, _currentSeparateAudioUri?.AbsoluteUri, _currentMediaHeaders);
         return true;
     }
 
@@ -814,6 +839,7 @@ public partial class MainWindow : Window
             {
                 _pendingSeparateAudio = audioOnlyUri;
                 _pendingAudioHeaders = headers;
+                _currentSeparateAudioUri = audioOnlyUri;
                 if (_resumePromptHandled && VideoPlayer.Source != null)
                 {
                     _pendingSeparateAudio = null;
@@ -939,6 +965,8 @@ public partial class MainWindow : Window
         PlaybackControls.Visibility = Visibility.Collapsed;
         ClearSubtitleOverlay();
         _currentVideoUrl = null;
+        _currentSeparateAudioUri = null;
+        _currentMediaHeaders = null;
         _resumePromptHandled = false;
         _pendingSeparateAudio = null;
         _pendingAudioHeaders = null;
@@ -1160,6 +1188,10 @@ public partial class MainWindow : Window
         PlaybackControls.Visibility = Visibility.Collapsed;
         ClearSubtitleOverlay();
         _currentVideoUrl = uri.AbsoluteUri;
+        _currentSeparateAudioUri = separateAudio;
+        _currentMediaHeaders = headers;
+        _isPaused = false;
+        PlayPauseButton.Content = "Ⅱ";
         _resumePromptHandled = false;
         ExpandMediaForPlayback();
         ReceivedImage.Visibility = Visibility.Collapsed;
@@ -1248,14 +1280,14 @@ public partial class MainWindow : Window
     {
         PlaybackControls.Visibility = Visibility.Visible;
         _controlsHideTimer.Stop();
-        if (PlayPauseButton.Content?.ToString() != "تشغيل") _controlsHideTimer.Start();
+        if (!_isPaused) _controlsHideTimer.Start();
     }
 
     private void HidePlaybackControlsIfNeeded()
     {
         _controlsHideTimer.Stop();
         if (VideoPlayer.Source != null && VideoPlayer.Visibility == Visibility.Visible
-            && PlayPauseButton.Content?.ToString() != "تشغيل" && !PlaybackControls.IsMouseOver)
+            && !_isPaused && !PlaybackControls.IsMouseOver)
             PlaybackControls.Visibility = Visibility.Collapsed;
     }
 
@@ -1263,18 +1295,20 @@ public partial class MainWindow : Window
     {
         bool videoActive = VideoPlayer.Source != null && VideoPlayer.Visibility == Visibility.Visible;
         if (!videoActive && !AudioPlayer.HasSource) return;
-        if (PlayPauseButton.Content?.ToString() == "تشغيل")
+        if (_isPaused)
         {
             if (videoActive) VideoPlayer.Play();
             if (AudioPlayer.HasSource) AudioPlayer.Resume();
-            PlayPauseButton.Content = "إيقاف مؤقت";
+            _isPaused = false;
+            PlayPauseButton.Content = "Ⅱ";
             if (videoActive) ShowPlaybackControls();
         }
         else
         {
             if (videoActive) VideoPlayer.Pause();
             if (AudioPlayer.HasSource) AudioPlayer.Pause();
-            PlayPauseButton.Content = "تشغيل";
+            _isPaused = true;
+            PlayPauseButton.Content = "▶";
             _controlsHideTimer.Stop();
             if (videoActive) PlaybackControls.Visibility = Visibility.Visible;
         }
@@ -1318,7 +1352,82 @@ public partial class MainWindow : Window
         _isMuted = !_isMuted;
         VideoPlayer.IsMuted = _isMuted;
         AudioPlayer.IsMuted = _isMuted;
-        MuteButton.Content = _isMuted ? "إلغاء الكتم" : "كتم";
+        MuteButton.Content = _isMuted ? "×" : "🔊";
+        MuteButton.ToolTip = _isMuted ? "إلغاء الكتم" : "كتم الصوت";
+    }
+
+    private void Repeat_Click(object sender, RoutedEventArgs e)
+    {
+        _repeatMode = _repeatMode switch
+        {
+            RepeatMode.Off => RepeatMode.One,
+            RepeatMode.One => RepeatMode.Playlist,
+            _ => RepeatMode.Off
+        };
+        (RepeatButton.Content, RepeatButton.ToolTip) = _repeatMode switch
+        {
+            RepeatMode.One => ("↻ 1", "تكرار الفيديو الحالي"),
+            RepeatMode.Playlist => ("↻ ∞", "تكرار قائمة التشغيل"),
+            _ => ("↻", "إيقاف التكرار")
+        };
+        if (VideoPlayer.Source != null && VideoPlayer.Visibility == Visibility.Visible)
+            ShowPlaybackControls();
+    }
+
+    private async void DownloadCurrentMedia_Click(object sender, RoutedEventArgs e)
+    {
+        if (!Uri.TryCreate(_currentVideoUrl, UriKind.Absolute, out var sourceUri) || !IsHttpUrl(_currentVideoUrl))
+        {
+            MessageBox.Show("لا يوجد فيديو قابل للتنزيل حاليًا.", "تنزيل الفيديو");
+            return;
+        }
+
+        string extension = Path.GetExtension(sourceUri.AbsolutePath).ToLowerInvariant();
+        string[] supported = { ".mp4", ".m4v", ".mkv", ".webm", ".mov", ".avi", ".mp3", ".m4a", ".aac", ".wav", ".flac", ".ogg" };
+        if (!supported.Contains(extension, StringComparer.OrdinalIgnoreCase))
+        {
+            MessageBox.Show("التنزيل المباشر متاح حاليًا للملفات ذات الامتداد المعروف فقط. قوائم HLS وDASH والبث الحي تحتاج تنزيلًا مخصصًا حتى لا نحفظ ملف قائمة بدل الفيديو.",
+                "نوع البث غير مدعوم للتنزيل", MessageBoxButton.OK, MessageBoxImage.Information);
+            return;
+        }
+
+        string fileName = Uri.UnescapeDataString(Path.GetFileName(sourceUri.AbsolutePath));
+        if (string.IsNullOrWhiteSpace(fileName)) fileName = "AboEzzat-video" + extension;
+        foreach (char invalid in Path.GetInvalidFileNameChars()) fileName = fileName.Replace(invalid, '_');
+        var dialog = new SaveFileDialog
+        {
+            Title = "حفظ الفيديو",
+            FileName = fileName,
+            DefaultExt = extension,
+            AddExtension = true,
+            OverwritePrompt = true,
+            Filter = $"ملفات {extension}|*{extension}|كل الملفات|*.*"
+        };
+        if (dialog.ShowDialog(this) != true) return;
+
+        DownloadButton.IsEnabled = false;
+        DownloadStatusText.Text = "جاري التنزيل…";
+        try
+        {
+            using var session = _mediaHeaderProxy.CreateSession(sourceUri, _currentMediaHeaders);
+            using var http = new HttpClient { Timeout = Timeout.InfiniteTimeSpan };
+            using var response = await http.GetAsync(session.GetProxyUri(sourceUri), HttpCompletionOption.ResponseHeadersRead);
+            response.EnsureSuccessStatusCode();
+            await using var input = await response.Content.ReadAsStreamAsync();
+            await using var output = new FileStream(dialog.FileName, FileMode.Create, FileAccess.Write, FileShare.None, 64 * 1024, useAsync: true);
+            await input.CopyToAsync(output);
+            DownloadStatusText.Text = "اكتمل التنزيل";
+            MessageBox.Show("تم حفظ الملف بنجاح.", "تنزيل الفيديو", MessageBoxButton.OK, MessageBoxImage.Information);
+        }
+        catch (Exception ex)
+        {
+            DownloadStatusText.Text = "فشل التنزيل";
+            MessageBox.Show("تعذّر تنزيل الملف: " + ex.Message, "تنزيل الفيديو", MessageBoxButton.OK, MessageBoxImage.Warning);
+        }
+        finally
+        {
+            DownloadButton.IsEnabled = true;
+        }
     }
 
     private void UpdatePlaybackControls()
@@ -1371,7 +1480,8 @@ public partial class MainWindow : Window
         }
         _resumeSaveTimer.Start();
         PlaybackControls.Visibility = Visibility.Visible;
-        PlayPauseButton.Content = "إيقاف مؤقت";
+        _isPaused = false;
+        PlayPauseButton.Content = "Ⅱ";
         _controlsTimer.Start();
         ShowPlaybackControls();
     }
@@ -1470,9 +1580,21 @@ public partial class MainWindow : Window
         _controlsTimer.Stop();
         _controlsHideTimer.Stop();
         PlaybackControls.Visibility = Visibility.Collapsed;
-        PlayPauseButton.Content = "تشغيل";
+        _isPaused = true;
+        PlayPauseButton.Content = "▶";
         if (!string.IsNullOrWhiteSpace(_currentVideoUrl)) _resumePositions.Remove(_currentVideoUrl);
         SaveResumePositions();
+
+        if (_repeatMode == RepeatMode.One && ReplayCurrentVideo()) return;
+        if (_repeatMode == RepeatMode.Playlist)
+        {
+            if (_incomingQueueSessionActive && _incomingQueue.Count > 0)
+            {
+                if (PlayIncomingQueueRelative(1) || PlayIncomingQueueAt(0)) return;
+            }
+            else if (ReplayCurrentVideo()) return;
+        }
+
         if (_incomingQueueSessionActive && _incomingQueueIndex >= 0
             && _incomingQueueIndex < _incomingQueue.Count
             && string.Equals(_currentVideoUrl, _incomingQueue[_incomingQueueIndex].VideoUrl,
@@ -1679,6 +1801,10 @@ public partial class MainWindow : Window
         _controlsHideTimer.Stop();
         PlaybackControls.Visibility = Visibility.Collapsed;
         RestoreHomeLayout();
+        _currentVideoUrl = null;
+        _currentSeparateAudioUri = null;
+        _currentMediaHeaders = null;
+        _isPaused = false;
         ClearSubtitleOverlay();
         StopAudioDeck();
         VideoPlayer.Stop();
