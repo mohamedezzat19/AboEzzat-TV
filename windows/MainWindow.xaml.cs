@@ -978,7 +978,8 @@ public partial class MainWindow : Window
         ReceivedImage.Visibility = Visibility.Collapsed;
         WelcomePanel.Visibility = Visibility.Collapsed;
         PlaySeparateAudio(uri, headers);
-        PlayPauseButton.Content = "إيقاف مؤقت";
+        _isPaused = false;
+        PlayPauseButton.Content = "Ⅱ";
     }
 
     private void StopAudioDeck()
