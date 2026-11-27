@@ -1681,6 +1681,8 @@ public partial class MainWindow : Window
         VideoPlayer.Source = null;
         VideoPlayer.Visibility = Visibility.Collapsed;
         _currentVideoUrl = null;
+        _currentSeparateAudioUri = null;
+        _currentMediaHeaders = null;
         _imageIndex = 0;
         ShowImage(_imagePlaylist[_imageIndex], _imagePlaylistHeaders);
         _imageSlideshowEnabled = _imagePlaylist.Count > 1;
@@ -1740,6 +1742,8 @@ public partial class MainWindow : Window
         _pendingSeparateAudio = null;
         _pendingAudioHeaders = null;
         _currentVideoUrl = null;
+        _currentSeparateAudioUri = null;
+        _currentMediaHeaders = null;
         _resumePromptHandled = false;
         ExpandMediaForPlayback();
         VideoPlayer.Stop();
