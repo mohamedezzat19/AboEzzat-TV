@@ -22,7 +22,7 @@ internal sealed class MediaHeaderProxy : IDisposable
 {
     private const int MaxConcurrentClients = 24;
     private const int MaxRequestHeaderBytes = 32 * 1024;
-    private const int MaxPlaylistBytes = 4 * 1024 * 1024;
+    internal const int MaxPlaylistBytes = 4 * 1024 * 1024;
     private const int MaxRedirects = 8;
 
     private static readonly byte[] CrLf = Encoding.ASCII.GetBytes("\r\n");
@@ -261,9 +261,15 @@ internal sealed class MediaHeaderProxy : IDisposable
 
         if (isHls)
         {
-            byte[] manifest = await response.Content.ReadAsByteArrayAsync(token).ConfigureAwait(false);
-            if (manifest.Length > MaxPlaylistBytes)
+            // Reject an oversized declared body before opening it, then enforce the same
+            // limit while streaming so chunked or dishonest Content-Length responses
+            // cannot be fully buffered before the size check.
+            if (response.Content.Headers.ContentLength is long declaredLength
+                && declaredLength > MaxPlaylistBytes)
                 throw new InvalidDataException("The HLS playlist is larger than the proxy limit.");
+
+            await using var manifestStream = await response.Content.ReadAsStreamAsync(token).ConfigureAwait(false);
+            byte[] manifest = await ReadBoundedAsync(manifestStream, MaxPlaylistBytes, token).ConfigureAwait(false);
 
             string text = Encoding.UTF8.GetString(manifest);
             byte[] rewritten = Encoding.UTF8.GetBytes(RewriteHlsPlaylist(text, finalUri, sessionId));
@@ -295,6 +301,31 @@ internal sealed class MediaHeaderProxy : IDisposable
             await clientStream.WriteAsync(CrLf, token).ConfigureAwait(false);
         }
         await clientStream.WriteAsync(ChunkTerminator, token).ConfigureAwait(false);
+    }
+
+    internal static async Task<byte[]> ReadBoundedAsync(
+        Stream source, int maxBytes, CancellationToken token)
+    {
+        ArgumentNullException.ThrowIfNull(source);
+        if (maxBytes <= 0) throw new ArgumentOutOfRangeException(nameof(maxBytes));
+
+        using var output = new MemoryStream(Math.Min(maxBytes, 64 * 1024));
+        byte[] buffer = new byte[64 * 1024];
+
+        while (true)
+        {
+            int remaining = maxBytes - checked((int)output.Length);
+            int readLimit = remaining < buffer.Length ? remaining + 1 : buffer.Length;
+            int read = await source.ReadAsync(buffer.AsMemory(0, readLimit), token).ConfigureAwait(false);
+            if (read == 0) break;
+
+            if (read > remaining)
+                throw new InvalidDataException("The HLS playlist is larger than the proxy limit.");
+
+            output.Write(buffer, 0, read);
+        }
+
+        return output.ToArray();
     }
 
     private async Task WriteResponseHeadersAsync(
